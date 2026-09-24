@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="VASP Trace evidence-first cryptocurrency investigation workbench">
+  <title>VASP Trace | Investigation Workbench</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/"><span class="brand-mark">VT</span><span><b>VASP TRACE</b><small>Evidence-first VASP attribution</small></span></a>
+    <div class="topbar-meta"><span id="liveSources" class="source-state">Checking providers</span><span id="apiStatus" class="status neutral">Connecting</span></div>
+  </header>
+
+  <main class="application-shell">
+    <section class="command-heading">
+      <div><p class="eyebrow">LEA investigation workspace</p><h1>Trace funds. Verify the endpoint. Route the right request.</h1><p class="subtle">Confirmed transaction evidence, reviewable VASP attribution, and action drafts in one case record.</p></div>
+      <div class="heading-actions"><button id="demoCaseButton" class="button secondary">Load guided demo</button><button id="newCaseButton" class="button primary">New investigation</button></div>
+    </section>
+
+    <section class="command-layout">
+      <aside class="case-rail card">
+        <div class="rail-head"><div><p class="eyebrow">Case command centre</p><h2>Investigations</h2></div><button id="refreshCases" class="icon-button" title="Refresh cases" aria-label="Refresh cases">↻</button></div>
+        <div id="caseList" class="case-list"><p class="empty">Loading investigations…</p></div>
+      </aside>
+
+      <section class="workbench card">
+        <div id="emptyState" class="empty-state"><div class="empty-icon">⌘</div><h2>Open an investigation</h2><p>Choose a case from the command centre or create a new wallet investigation.</p></div>
+
+        <div id="caseView" hidden>
+          <header class="case-header">
+            <div><p id="caseMeta" class="eyebrow"></p><h2 id="caseTitle"></h2><p id="caseWallet" class="mono wallet"></p></div>
+            <div class="case-actions"><label class="compact-field">Trace depth<select id="traceDepth"><option value="1">1 hop</option><option value="2">2 hops</option><option value="3" selected>3 hops</option><option value="4">4 hops</option><option value="5">5 hops</option></select></label><button id="traceButton" class="button primary">Run confirmed trace</button><button id="reviewButton" class="button secondary">Mark under review</button></div>
+          </header>
+
+          <div id="notice" class="notice" hidden></div>
+          <div id="preTrace" class="pre-trace"><span class="pre-trace-icon">◎</span><div><strong>Evidence-first trace is ready</strong><p>Runs retrieve confirmed transfers, preserve provider provenance, and show any coverage gaps.</p></div></div>
+
+          <div id="resultView" hidden>
+            <section class="summary-grid">
+              <article><span>Trace status</span><strong id="traceStatus">—</strong><small id="traceRun">Awaiting trace</small></article>
+              <article><span>Case flow allocated</span><strong id="attributedValue">—</strong><small id="flowMethod">Conservative allocation</small></article>
+              <article><span>Supported VASPs</span><strong id="candidateCount">—</strong><small id="nearestHop">No endpoint selected</small></article>
+              <article><span>Evidence coverage</span><strong id="coverageValue">—</strong><small id="coverageDetail">Provider retrieval</small></article>
+            </section>
+
+            <section class="investigation-layout">
+              <aside class="trace-sidebar">
+                <div class="side-section"><div class="section-title"><span>Trace scope</span></div><dl id="scopeList" class="definition-list"></dl></div>
+                <div class="side-section"><div class="section-title"><span>Nearest supported VASPs</span><span id="candidateBadge" class="count-badge">0</span></div><div id="candidateList" class="candidate-list"></div></div>
+                <div class="side-section"><div class="section-title"><span>Path controls</span></div><button id="resetGraphButton" class="button secondary full">Show full trace</button><p class="microcopy">Select a VASP to isolate its shortest supporting path.</p></div>
+              </aside>
+
+              <section class="graph-panel">
+                <div class="graph-head"><div><p class="eyebrow">Confirmed transaction graph</p><h3>Funds-of-interest view</h3></div><div class="graph-tools"><button id="zoomOutButton" class="icon-button" title="Zoom out">−</button><button id="zoomInButton" class="icon-button" title="Zoom in">+</button><button id="fitGraphButton" class="button secondary small">Fit graph</button></div></div>
+                <div class="graph-legend"><span><i class="legend-dot suspect"></i>Suspect</span><span><i class="legend-dot observed"></i>Intermediary</span><span><i class="legend-dot vasp"></i>Reviewed VASP</span><span><i class="legend-dot frontier"></i>Evidence gap</span></div>
+                <div id="traceGraph" class="trace-graph" aria-label="Interactive transaction graph"></div>
+                <p class="graph-caption">Edge width represents the case-attributed amount. Select a node or edge to inspect the underlying evidence.</p>
+              </section>
+
+              <aside class="inspector-panel">
+                <div class="inspector-head"><div><p class="eyebrow">Evidence inspector</p><h3>Selection details</h3></div><span id="inspectorType" class="type-badge">None</span></div>
+                <div id="inspectorContent" class="inspector-content"><div class="inspector-empty"><span>⌁</span><p>Select a wallet, transfer, VASP, or evidence gap in the graph.</p></div></div>
+              </aside>
+            </section>
+
+            <section class="evidence-rail card-inset">
+              <div class="tab-bar" role="tablist"><button class="tab active" data-tab="transactions">Transactions</button><button class="tab" data-tab="risks">Risk patterns</button><button class="tab" data-tab="coverage">Coverage gaps</button><button class="tab" data-tab="crosscase">Cross-case</button></div>
+              <div id="evidenceTabContent" class="tab-content"></div>
+            </section>
+
+            <section class="action-centre card-inset">
+              <div><p class="eyebrow">Action and evidence centre</p><h3>Review before routing</h3><p class="subtle">A request remains a local draft until an investigator and legal reviewer approve it.</p></div>
+              <div id="actionChecklist" class="action-checklist"></div>
+              <div class="action-buttons"><button id="challengeButton" class="button secondary" disabled>Challenge top evidence</button><button id="verifyButton" class="button secondary" disabled>Verify trace receipt</button><button id="reportButton" class="button secondary" disabled>Download report</button><button id="draftButton" class="button primary" disabled>Create SAHYOG draft</button></div>
+            </section>
+          </div>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <dialog id="caseDialog"><form id="caseForm" method="dialog"><div class="dialog-head"><div><p class="eyebrow">New investigation</p><h2>Case intake</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div><label>Case title<input name="title" required placeholder="USDT fraud investigation"></label><label>Suspect wallet<input name="suspect_wallet" required placeholder="T... or 0x..."></label><div class="form-grid"><label>Chain<select name="chain"><option value="TRON">TRON</option><option value="ETHEREUM">Ethereum</option><option value="BNB_CHAIN">BNB Chain</option><option value="POLYGON">Polygon</option></select></label><label>Asset<input name="token_symbol" value="USDT" required></label></div><div class="form-grid"><label>Disputed amount<input name="disputed_amount" type="number" min="0" step="0.000001" placeholder="Optional"></label><label>FIR number<input name="fir_number" placeholder="Optional"></label></div><label>Investigation note<textarea name="notes" rows="3" placeholder="Optional context"></textarea></label><div class="dialog-actions"><button value="cancel" class="button secondary">Cancel</button><button class="button primary" value="default">Create investigation</button></div></form></dialog>
+
+  <script src="/static/vendor/cytoscape.min.js"></script>
+  <script src="/static/graph.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

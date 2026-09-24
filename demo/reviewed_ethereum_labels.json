@@ -1,0 +1,32 @@
+[
+  {
+    "address": "0x21a31ee1afc51d94c2efccaa2092ad1028285549",
+    "chain": "ETHEREUM",
+    "vasp_name": "Binance",
+    "entity_kind": "vasp",
+    "label_type": "hot_wallet",
+    "confidence": "verified",
+    "reviewer": "Project public-source review",
+    "expires_at": "2026-12-24T00:00:00Z",
+    "source": {
+      "url": "https://etherscan.io/address/0x21a31ee1afc51d94c2efccaa2092ad1028285549",
+      "source_name": "Etherscan public address label: Binance 15",
+      "observed_at": "2026-09-24T00:00:00Z"
+    }
+  },
+  {
+    "address": "0x28c6c06298d514db089934071355e5743bf21d60",
+    "chain": "ETHEREUM",
+    "vasp_name": "Binance",
+    "entity_kind": "vasp",
+    "label_type": "hot_wallet",
+    "confidence": "verified",
+    "reviewer": "Project public-source review",
+    "expires_at": "2026-12-24T00:00:00Z",
+    "source": {
+      "url": "https://etherscan.io/address/0x28c6c06298d514db089934071355e5743bf21d60",
+      "source_name": "Etherscan public address label: Binance 14",
+      "observed_at": "2026-09-24T00:00:00Z"
+    }
+  }
+]

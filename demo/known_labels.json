@@ -1,0 +1,16 @@
+[
+  {
+    "address": "REPLACE_WITH_REVIEWED_ADDRESS",
+    "chain": "TRON",
+    "vasp_name": "Example VASP",
+    "entity_kind": "vasp",
+    "label_type": "hot_wallet",
+    "confidence": "verified",
+    "reviewer": "Named analyst",
+    "source": {
+      "url": "https://source.example/record",
+      "source_name": "Authoritative entity label source",
+      "observed_at": "2026-09-24T00:00:00Z"
+    }
+  }
+]
