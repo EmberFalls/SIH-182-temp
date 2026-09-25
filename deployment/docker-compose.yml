@@ -5,28 +5,12 @@ services:
       dockerfile: deployment/Dockerfile
     env_file:
       - ../.env
+    environment:
+      DATABASE_PATH: /data/vasp_trace.db
     ports:
       - "8000:8000"
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: vasp_trace
-      POSTGRES_USER: vasp_trace
-      POSTGRES_PASSWORD: replace-before-deployment
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U vasp_trace -d vasp_trace"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-    ports:
-      - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./postgres_schema.sql:/docker-entrypoint-initdb.d/001_schema.sql:ro
+      - vasp_trace_data:/data
 
 volumes:
-  postgres_data:
+  vasp_trace_data:

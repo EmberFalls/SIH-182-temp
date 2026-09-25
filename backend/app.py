@@ -1,17 +1,72 @@
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
+
 from fastapi import FastAPI, HTTPException, Request, status
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 
 from .config import settings
+from .capabilities import ChainCapabilityV2, capability_matrix
+from .adapters import LegacyExplorerAdapter
+from .investigation_v2 import InvestigationRunnerV2
 from .demo import DemoScenarioService
+from .entity_resolution import EntityResolver
+from .cross_chain_v2 import (
+    BridgeRouteCreateV2,
+    BridgeRouteV2,
+    CrossChainContinuationRequestV2,
+    CrossChainContinuationV2,
+    CrossChainLinkV2,
+    CrossChainResolveRequestV2,
+    CrossChainResolverV2,
+    new_bridge_route,
+)
+from .v2_demo import V2DemoScenarioService
+from .domain import (
+    CaseCreateV2,
+    CaseStatusUpdateV2,
+    InvestigationTraceRequestV2,
+    AssertionReviewV2,
+    AssertionReviewEventV2,
+    RawEvidenceArtifact,
+    Entity,
+    EntityAddressAssertion,
+    EntityAddressAssertionCreate,
+    EntityCreate,
+    IntelligenceSource,
+    IntelligenceSourceCreate,
+    FeatureSnapshotV2,
+    MLDatasetBuildRequest,
+    MLFeatureSnapshotRequest,
+    MLInferenceRequest,
+    MLPairAssociationRequest,
+    ModelInferenceV2,
+    ModelVersionV2,
+    MLRoleTrainingRequest,
+    TrainingDatasetV2,
+    InvestigationCaseV2,
+    InvestigationResultV2,
+    RequestDraftV2,
+    ResolvedEntityAssertion,
+)
+from .ml_v2 import (
+    MLInferenceAdapter,
+    ModelEvaluation,
+    SoftmaxLogisticRoleBaseline,
+    TrainingDatasetBuilder,
+    VaspPairAssociationBaseline,
+    WalletFeatureExtractor,
+    register_pair_association_baseline,
+    register_trained_role_model,
+)
 from .jobs import TraceJobs
 from .models import CaseCreate, CaseNote, CaseNoteCreate, CaseSummary, CaseUpdate, ChallengeRequest, ChallengeResult, LabelImportResult, LabelReview, LabelReviewEvent, SahyogDraft, TraceRequest, TraceResult, VaspCandidate, VaspLabel, VaspLabelCreate
 from .reports import InvestigationReport
+from .reports_v2 import InvestigationResultReportV2
+from .request_export_v2 import GenericSahyogDraftExporter
 from .sahyog import SahyogDraftService
 from .security import require_role, security_middleware
 from .storage import Store
@@ -23,16 +78,23 @@ store = Store()
 trace_service = TraceService(store)
 trace_jobs = TraceJobs()
 report_renderer = InvestigationReport()
+v2_report_renderer = InvestigationResultReportV2()
+v2_request_exporter = GenericSahyogDraftExporter()
 sahyog_drafts = SahyogDraftService()
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    store.migrate_legacy_labels_to_assertions()
     yield
 
 
-app = FastAPI(title="VASP Trace API", version="0.1.0", lifespan=lifespan,
-              description="Evidence-first tracing service. A VASP is reported only when a receiving address has sourced registry evidence.")
+app = FastAPI(
+    title="VASP Trace API",
+    version="0.1.0",
+    lifespan=lifespan,
+    description="Evidence-first tracing service. A VASP is reported only when a receiving address has sourced registry evidence.",
+)
 app.middleware("http")(security_middleware)
 
 
@@ -42,7 +104,19 @@ def audit(request: Request, action: str, resource: str, detail: dict | None = No
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "service": "vasp-trace-api", "live_sources": {"trongrid": bool(settings.trongrid_api_key), "etherscan": bool(settings.etherscan_api_key)}, "supported_chains": ["TRON", "ETHEREUM", "BNB_CHAIN", "POLYGON"], "planned_chain_adapters": ["BITCOIN", "SOLANA"]}
+    return {
+        "status": "ok",
+        "service": "vasp-trace-api",
+        "live_sources": {"trongrid": bool(settings.trongrid_api_key), "etherscan": bool(settings.etherscan_api_key)},
+        "supported_chains": [chain for chain in ("TRON", "ETHEREUM", "BNB_CHAIN", "POLYGON") if any(item.chain.value == chain and item.transfers == "FULL" for item in capability_matrix())],
+        "planned_chain_adapters": [item.chain.value for item in capability_matrix() if item.transfers == "NOT_IMPLEMENTED"],
+    }
+
+
+@app.get("/v2/capabilities", response_model=list[ChainCapabilityV2])
+def get_capability_matrix_v2() -> list[ChainCapabilityV2]:
+    """Declare actual adapter maturity; no unsupported chain is advertised as traceable."""
+    return capability_matrix()
 
 
 @app.post("/demo/scenarios/multihop-deposit-sweep")
@@ -52,6 +126,13 @@ def load_multihop_demo(request: Request) -> dict:
     audit(request, "SIMULATED_DEMO_LOADED", result.run_id, {"case_id": case.id, "scenario": "multihop_deposit_sweep"})
     return {"case": case, "trace": result}
 
+
+@app.post("/demo/scenarios/v2-deposit-inference")
+async def load_v2_deposit_inference_demo(request: Request) -> dict:
+    """Load the v2 synthetic evidence fixture for offline demonstration only."""
+    result = await V2DemoScenarioService(store).create_deposit_inference()
+    audit(request, "SYNTHETIC_V2_DEMO_LOADED", result["case"].id, {"scenario": "v2_deposit_inference"})
+    return result
 
 @app.post("/cases", response_model=CaseSummary, status_code=status.HTTP_201_CREATED)
 def create_case(payload: CaseCreate, request: Request) -> CaseSummary:
@@ -66,6 +147,279 @@ def create_case(payload: CaseCreate, request: Request) -> CaseSummary:
 def list_cases() -> list[CaseSummary]:
     return store.list_cases()
 
+
+@app.post("/v2/cases", response_model=InvestigationCaseV2, status_code=status.HTTP_201_CREATED)
+def create_investigation_case_v2(payload: CaseCreateV2, request: Request) -> InvestigationCaseV2:
+    """Create a v2 case without changing the legacy wallet-case contract."""
+    case = store.create_investigation_case_v2(payload, getattr(request.state, "actor", "local-development"))
+    audit(request, "CASE_V2_CREATED", case.id, {"seed_type": case.context.seed_type.value, "data_mode": case.context.data_mode.value})
+    return case
+
+
+@app.get("/v2/cases", response_model=list[InvestigationCaseV2])
+def list_investigation_cases_v2() -> list[InvestigationCaseV2]:
+    return store.list_investigation_cases_v2()
+
+
+@app.get("/v2/cases/{case_id}", response_model=InvestigationCaseV2)
+def get_investigation_case_v2(case_id: str) -> InvestigationCaseV2:
+    case = store.get_investigation_case_v2(case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="V2 investigation case not found")
+    return case
+@app.patch("/v2/cases/{case_id}/status", response_model=InvestigationCaseV2)
+def update_investigation_case_v2_status(case_id: str, payload: CaseStatusUpdateV2, request: Request) -> InvestigationCaseV2:
+    case = store.update_investigation_case_v2_status(case_id, payload.status)
+    if not case:
+        raise HTTPException(status_code=404, detail="V2 investigation case not found")
+    audit(request, "CASE_V2_STATUS_UPDATED", case_id, {"status": case.status})
+    return case
+
+
+def _v2_explorer_adapter(chain):
+    clients = {
+        "TRON": trace_service.tron,
+        "ETHEREUM": trace_service.ethereum,
+        "BNB_CHAIN": trace_service.bnb,
+        "POLYGON": trace_service.polygon,
+    }
+    client = clients.get(chain.value)
+    if client is None:
+        raise ValueError(f"No v2 explorer adapter is implemented for {chain.value}.")
+    return LegacyExplorerAdapter(chain, client)
+
+
+@app.post("/v2/cases/{case_id}/trace", response_model=InvestigationResultV2, status_code=status.HTTP_201_CREATED)
+async def trace_investigation_case_v2(case_id: str, payload: InvestigationTraceRequestV2, request: Request) -> InvestigationResultV2:
+    require_role(request, "investigator", "supervisor", "admin")
+    case = store.get_investigation_case_v2(case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="V2 investigation case not found")
+    try:
+        result = await InvestigationRunnerV2(store, _v2_explorer_adapter).run(case, payload)
+    except ProviderUnavailable as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    audit(request, "V2_TRACE_COMPLETED", result.id, {"case_id": case_id, "version": result.version, "data_mode": result.data_mode.value, "manifest_sha256": result.evidence_manifest.sha256})
+    return result
+
+@app.get("/v2/cases/{case_id}/results", response_model=list[InvestigationResultV2])
+def list_investigation_results_v2(case_id: str) -> list[InvestigationResultV2]:
+    if not store.get_investigation_case_v2(case_id):
+        raise HTTPException(status_code=404, detail="V2 investigation case not found")
+    return store.list_investigation_results_v2(case_id)
+
+
+@app.post("/v2/bridges/routes", response_model=BridgeRouteV2, status_code=status.HTTP_201_CREATED)
+def create_bridge_route_v2(payload: BridgeRouteCreateV2, request: Request) -> BridgeRouteV2:
+    require_role(request, "label_reviewer", "supervisor", "admin")
+    entity = store.get_entity(payload.bridge_entity_id)
+    if entity is None or entity.entity_type.value != "BRIDGE":
+        raise HTTPException(status_code=422, detail="bridge_entity_id must reference a registered BRIDGE entity.")
+    route = store.save_bridge_route_v2(new_bridge_route(payload, datetime.now(timezone.utc)))
+    audit(request, "BRIDGE_ROUTE_REGISTERED", route.id, {"protocol": route.protocol, "source_chain": route.source_chain.value, "destination_chain": route.destination_chain.value, "review_state": route.review_state.value})
+    return route
+
+
+@app.get("/v2/bridges/routes", response_model=list[BridgeRouteV2])
+def list_bridge_routes_v2() -> list[BridgeRouteV2]:
+    return store.list_bridge_routes_v2()
+
+
+@app.post("/v2/cross-chain/links/resolve", response_model=CrossChainLinkV2, status_code=status.HTTP_201_CREATED)
+def resolve_cross_chain_link_v2(payload: CrossChainResolveRequestV2, request: Request) -> CrossChainLinkV2:
+    require_role(request, "investigator", "supervisor", "admin")
+    try:
+        link = CrossChainResolverV2(store).resolve(payload, datetime.now(timezone.utc))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    saved = store.save_cross_chain_link_v2(link)
+    audit(request, "CROSS_CHAIN_LINK_VERIFIED", saved.id, {"route_id": saved.route_id, "protocol": saved.protocol, "message_id": saved.message_id})
+    return saved
+
+
+@app.get("/v2/cross-chain/links", response_model=list[CrossChainLinkV2])
+def list_cross_chain_links_v2(route_id: str | None = None) -> list[CrossChainLinkV2]:
+    return store.list_cross_chain_links_v2(route_id)
+
+
+@app.get("/v2/cross-chain/links/{link_id}", response_model=CrossChainLinkV2)
+def get_cross_chain_link_v2(link_id: str) -> CrossChainLinkV2:
+    link = store.get_cross_chain_link_v2(link_id)
+    if not link:
+        raise HTTPException(status_code=404, detail="Cross-chain link not found")
+    return link
+
+
+@app.post("/v2/cross-chain/links/{link_id}/continuations", response_model=CrossChainContinuationV2)
+def create_cross_chain_continuation_v2(link_id: str, payload: CrossChainContinuationRequestV2, request: Request) -> CrossChainContinuationV2:
+    require_role(request, "investigator", "supervisor", "admin")
+    link = store.get_cross_chain_link_v2(link_id)
+    if not link:
+        raise HTTPException(status_code=404, detail="Cross-chain link not found")
+    try:
+        continuation = CrossChainResolverV2(store).continuation(link, payload.source_allocation_id, payload.source_attributed_amount)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    audit(request, "CROSS_CHAIN_CONTINUATION_CREATED", link_id, {"source_allocation_id": payload.source_allocation_id, "destination_amount": str(continuation.destination_attributed_amount)})
+    return continuation
+
+
+@app.post("/v2/ml/feature-snapshots", response_model=FeatureSnapshotV2, status_code=status.HTTP_201_CREATED)
+def create_ml_feature_snapshot(payload: MLFeatureSnapshotRequest, request: Request) -> FeatureSnapshotV2:
+    require_role(request, "investigator", "supervisor", "admin")
+    snapshot = WalletFeatureExtractor(EntityResolver(store)).build(payload.address, payload.asset, payload.transfers, payload.snapshot_time)
+    saved = store.save_feature_snapshot_v2(snapshot)
+    audit(request, "ML_FEATURE_SNAPSHOT_CREATED", saved.id, {"feature_schema_version": saved.feature_schema_version, "evidence_count": len(saved.evidence_ids)})
+    return saved
+
+
+@app.get("/v2/ml/feature-snapshots/{snapshot_id}", response_model=FeatureSnapshotV2)
+def get_ml_feature_snapshot(snapshot_id: str) -> FeatureSnapshotV2:
+    snapshot = store.get_feature_snapshot_v2(snapshot_id)
+    if not snapshot:
+        raise HTTPException(status_code=404, detail="ML feature snapshot not found")
+    return snapshot
+
+
+@app.post("/v2/ml/datasets/build", response_model=TrainingDatasetV2, status_code=status.HTTP_201_CREATED)
+def build_ml_training_dataset(payload: MLDatasetBuildRequest, request: Request) -> TrainingDatasetV2:
+    require_role(request, "label_reviewer", "supervisor", "admin")
+    snapshots: list[FeatureSnapshotV2] = []
+    missing: list[str] = []
+    for snapshot_id in payload.feature_snapshot_ids:
+        snapshot = store.get_feature_snapshot_v2(snapshot_id)
+        if snapshot:
+            snapshots.append(snapshot)
+        else:
+            missing.append(snapshot_id)
+    if missing:
+        raise HTTPException(status_code=404, detail={"message": "Feature snapshots not found", "ids": missing})
+    dataset = TrainingDatasetBuilder(store, EntityResolver(store)).build(snapshots)
+    saved = store.save_training_dataset_v2(dataset)
+    audit(request, "ML_DATASET_BUILT", saved.id, {"reviewed_rows": saved.reviewed_row_count, "weak_rows": saved.weak_row_count, "excluded_unlabeled": saved.excluded_unlabeled_count})
+    return saved
+
+
+@app.get("/v2/ml/datasets/{dataset_id}", response_model=TrainingDatasetV2)
+def get_ml_training_dataset(dataset_id: str) -> TrainingDatasetV2:
+    dataset = store.get_training_dataset_v2(dataset_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="ML training dataset not found")
+    return dataset
+
+
+@app.post("/v2/ml/models/role-classifier/train", response_model=ModelVersionV2, status_code=status.HTTP_201_CREATED)
+def train_ml_role_classifier(payload: MLRoleTrainingRequest, request: Request) -> ModelVersionV2:
+    require_role(request, "supervisor", "admin")
+    dataset = store.get_training_dataset_v2(payload.dataset_id)
+    if not dataset:
+        raise HTTPException(status_code=404, detail="ML training dataset not found")
+    snapshots = {row.feature_snapshot_id: store.get_feature_snapshot_v2(row.feature_snapshot_id) for row in dataset.rows}
+    if any(item is None for item in snapshots.values()):
+        raise HTTPException(status_code=409, detail="The dataset references a missing feature snapshot.")
+    classifier = SoftmaxLogisticRoleBaseline().train(dataset.rows, snapshots)
+    reviewed_rows = [row for row in dataset.rows if row.label_tier.value == "REVIEWED_GROUND_TRUTH"]
+    metrics = ModelEvaluation.evaluate(classifier, reviewed_rows, snapshots)
+    metrics["evaluation_scope"] = "training-only diagnostic; temporal and entity-holdout metrics must be recorded before operational activation"
+    model = register_trained_role_model(store, dataset, classifier, metrics, enabled=False)
+    audit(request, "ML_ROLE_MODEL_REGISTERED", model.id, {"dataset": dataset.id, "artifact_sha256": model.artifact_sha256, "enabled": False})
+    return model
+
+
+@app.get("/v2/ml/models/{model_id}", response_model=ModelVersionV2)
+def get_ml_model_version(model_id: str) -> ModelVersionV2:
+    model = store.get_model_version_v2(model_id)
+    if not model:
+        raise HTTPException(status_code=404, detail="ML model version not found")
+    return model
+
+
+@app.post("/v2/ml/models/{model_id}/inferences", response_model=ModelInferenceV2, status_code=status.HTTP_201_CREATED)
+def infer_ml_role(model_id: str, payload: MLInferenceRequest, request: Request) -> ModelInferenceV2:
+    require_role(request, "investigator", "supervisor", "admin")
+    model = store.get_model_version_v2(model_id)
+    snapshot = store.get_feature_snapshot_v2(payload.feature_snapshot_id)
+    if not model:
+        raise HTTPException(status_code=404, detail="ML model version not found")
+    if not snapshot:
+        raise HTTPException(status_code=404, detail="ML feature snapshot not found")
+    try:
+        inference = MLInferenceAdapter(model, enabled=settings.ml_enabled, strong_threshold=settings.ml_role_strong_threshold, weak_threshold=settings.ml_role_weak_threshold).infer(snapshot)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    saved = store.save_model_inference_v2(inference)
+    audit(request, "ML_INFERENCE_RECORDED", saved.id, {"model_version_id": model.id, "status": saved.status.value, "assertion_type": "ML_INFERRED"})
+    return saved
+
+
+@app.post("/v2/ml/pair-associations", response_model=ModelInferenceV2, status_code=status.HTTP_201_CREATED)
+def infer_vasp_pair_association(payload: MLPairAssociationRequest, request: Request) -> ModelInferenceV2:
+    require_role(request, "investigator", "supervisor", "admin")
+    model = register_pair_association_baseline(store)
+    if not settings.ml_enabled:
+        raise HTTPException(status_code=409, detail="ML inference is disabled by configuration. Set ML_ENABLED only after validation and authorized review.")
+    baseline = VaspPairAssociationBaseline(store)
+    pair = baseline.features(payload.address, payload.candidate_entity_id, payload.asset, payload.transfers, payload.snapshot_time)
+    inference = baseline.infer(pair, model.id)
+    saved = store.save_model_inference_v2(inference)
+    audit(request, "ML_PAIR_ASSOCIATION_RECORDED", saved.id, {"model_version_id": model.id, "status": saved.status.value, "assertion_type": "ML_INFERRED"})
+    return saved
+
+@app.get("/v2/results/{result_id}", response_model=InvestigationResultV2)
+def get_investigation_result_v2(result_id: str) -> InvestigationResultV2:
+    result = store.get_investigation_result_v2(result_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="V2 investigation result not found")
+    return result
+
+
+@app.get("/v2/results/{result_id}/evidence-manifest")
+def get_investigation_result_manifest_v2(result_id: str) -> dict:
+    result = store.get_investigation_result_v2(result_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="V2 investigation result not found")
+    return result.evidence_manifest.model_dump(mode="json")
+
+
+@app.get("/v2/results/{result_id}/report.pdf")
+def investigation_result_report_v2(result_id: str, request: Request) -> Response:
+    result = store.get_investigation_result_v2(result_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="V2 investigation result not found")
+    case = store.get_investigation_case_v2(result.case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="V2 investigation case not found")
+    report = v2_report_renderer.render(case, result)
+    audit(request, "V2_REPORT_EXPORTED", result.id, {"manifest_sha256": result.evidence_manifest.sha256})
+    return Response(content=report, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{result.id}-investigation-report.pdf"'})
+
+
+@app.post("/v2/results/{result_id}/request-drafts", response_model=RequestDraftV2, status_code=status.HTTP_201_CREATED)
+def create_request_draft_v2(result_id: str, request: Request, candidate_id: str | None = None, request_purpose: str = "Request preservation, KYC, and relevant transaction records under authorized process.", investigator_notes: str = "") -> RequestDraftV2:
+    require_role(request, "investigator", "supervisor", "admin")
+    result = store.get_investigation_result_v2(result_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="V2 investigation result not found")
+    case = store.get_investigation_case_v2(result.case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="V2 investigation case not found")
+    try:
+        draft = v2_request_exporter.build_draft(case, result, candidate_id, request_purpose, investigator_notes)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    store.save_request_draft_v2(draft)
+    audit(request, "LOCAL_REQUEST_DRAFT_V2_CREATED", draft.id, {"result_id": result.id, "manifest_sha256": result.evidence_manifest.sha256})
+    return draft
+
+
+@app.get("/v2/request-drafts/{draft_id}", response_model=RequestDraftV2)
+def get_request_draft_v2(draft_id: str) -> RequestDraftV2:
+    draft = store.get_request_draft_v2(draft_id)
+    if not draft:
+        raise HTTPException(status_code=404, detail="Local request draft not found")
+    return draft
 
 @app.get("/cases/{case_id}", response_model=CaseSummary)
 def get_case(case_id: str) -> CaseSummary:
@@ -134,6 +488,71 @@ def import_vasp_labels(payload: list[VaspLabelCreate], request: Request) -> Labe
     return LabelImportResult(imported=imported, rejected=rejected)
 
 
+@app.post("/v2/intelligence/sources", response_model=IntelligenceSource, status_code=status.HTTP_201_CREATED)
+def create_intelligence_source(payload: IntelligenceSourceCreate, request: Request) -> IntelligenceSource:
+    require_role(request, "label_reviewer", "supervisor", "admin")
+    source = store.create_intelligence_source(payload)
+    audit(request, "INTELLIGENCE_SOURCE_CREATED", source.id, {"source_type": source.source_type.value, "trust_tier": source.trust_tier.value})
+    return source
+
+
+@app.post("/v2/intelligence/entities", response_model=Entity, status_code=status.HTTP_201_CREATED)
+def create_entity(payload: EntityCreate, request: Request) -> Entity:
+    require_role(request, "label_reviewer", "supervisor", "admin")
+    entity = store.create_entity(payload)
+    audit(request, "ENTITY_CREATED", entity.id, {"entity_type": entity.entity_type.value})
+    return entity
+
+
+@app.post("/v2/intelligence/assertions", response_model=EntityAddressAssertion, status_code=status.HTTP_201_CREATED)
+def create_entity_address_assertion(payload: EntityAddressAssertionCreate, request: Request) -> EntityAddressAssertion:
+    require_role(request, "label_reviewer", "supervisor", "admin")
+    try:
+        assertion = store.create_entity_address_assertion(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    audit(request, "ENTITY_ASSERTION_CREATED", assertion.id, {"entity_id": assertion.entity_id, "assertion_type": assertion.assertion_type.value})
+    return assertion
+
+
+@app.post("/v2/intelligence/assertions/{assertion_id}/reviews", response_model=EntityAddressAssertion)
+def review_entity_address_assertion_v2(assertion_id: str, payload: AssertionReviewV2, request: Request) -> EntityAddressAssertion:
+    require_role(request, "label_reviewer", "supervisor", "admin")
+    try:
+        assertion = store.review_entity_address_assertion_v2(assertion_id, getattr(request.state, "actor", "local-development"), payload.review_state, payload.rationale)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not assertion:
+        raise HTTPException(status_code=404, detail="Entity assertion not found")
+    audit(request, "ENTITY_ASSERTION_REVIEWED", assertion_id, {"review_state": payload.review_state})
+    return assertion
+
+
+@app.get("/v2/intelligence/assertions/{assertion_id}/reviews", response_model=list[AssertionReviewEventV2])
+def list_entity_address_assertion_reviews_v2(assertion_id: str) -> list[AssertionReviewEventV2]:
+    if not store.get_entity_address_assertion(assertion_id):
+        raise HTTPException(status_code=404, detail="Entity assertion not found")
+    return store.list_entity_address_assertion_reviews_v2(assertion_id)
+
+
+@app.get("/v2/evidence/{artifact_id}", response_model=RawEvidenceArtifact)
+def get_raw_evidence_artifact_v2(artifact_id: str) -> RawEvidenceArtifact:
+    artifact = store.get_raw_evidence_artifact_v2(artifact_id)
+    if not artifact:
+        raise HTTPException(status_code=404, detail="Raw evidence artifact not found")
+    return artifact
+
+@app.get("/v2/intelligence/assertions", response_model=list[ResolvedEntityAssertion])
+def resolve_entity_assertions(address: str, chain: str) -> list[ResolvedEntityAssertion]:
+    return store.resolve_entity_assertions(address, chain)
+
+
+@app.post("/v2/intelligence/migrations/legacy-labels")
+def migrate_legacy_labels(request: Request) -> dict[str, int]:
+    require_role(request, "label_reviewer", "supervisor", "admin")
+    outcome = store.migrate_legacy_labels_to_assertions()
+    audit(request, "LEGACY_LABELS_MIGRATED", "entity_address_assertions", outcome)
+    return outcome
 @app.get("/labels/{label_id}/reviews", response_model=list[LabelReviewEvent])
 def label_reviews(label_id: str) -> list[LabelReviewEvent]:
     return store.label_review_history(label_id)

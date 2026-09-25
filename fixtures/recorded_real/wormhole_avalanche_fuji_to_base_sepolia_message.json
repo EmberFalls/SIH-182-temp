@@ -1,0 +1,16 @@
+{
+  "fixture_id": "wormhole-avalanche-fuji-base-sepolia-message-2026-07-08",
+  "data_mode": "RECORDED_REAL",
+  "protocol": "Wormhole Messaging",
+  "source_chain": "Avalanche Fuji",
+  "destination_chain": "Base Sepolia",
+  "source_transaction_hash": "0x9d359a66ba42baced80062229c0b02b4f523fe304aff3473dcf53117aee13fb6",
+  "source_sender_contract": "0xD720BFF42a0960cfF1118454A907a44dB358f2b1",
+  "destination_receiver_contract": "0x692550997C252cC5044742D1A2BD91E4f4b46D39",
+  "evidence_source": "https://docs.wormhole.com/products/messaging/tutorials/cross-chain-contracts/",
+  "recorded_at": "2026-09-25T09:00:00Z",
+  "fixture_scope": "Public documentation records this source transaction and its configured destination receiver as a Wormhole testnet message example.",
+  "continuation_eligibility": "NOT_ELIGIBLE",
+  "boundary_reason": "The public tutorial does not provide the destination transaction hash or an extracted exact protocol message identifier. The v2 resolver therefore must not use this fixture to continue a fund flow.",
+  "verification_instruction": "A production adapter must fetch source and destination events, extract the same exact protocol message identifier, and submit both events to the cross-chain resolve endpoint."
+}

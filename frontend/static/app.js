@@ -301,6 +301,23 @@ function bindEvents() {
   document.querySelectorAll(".tab").forEach(button => button.onclick = () => { state.activeTab = button.dataset.tab; renderEvidenceTab(); });
 }
 
+function capabilityTone(value) {
+  return value === "FULL" ? "full" : value === "EXPERIMENTAL" || value === "REGISTRY_ENABLED" ? "experimental" : "planned";
+}
+
+async function loadCapabilities() {
+  const target = $("#capabilityMatrix");
+  if (!target) return;
+  try {
+    const rows = await api("/v2/capabilities");
+    const labels = '<div class="capability-row capability-labels"><span>Network</span><span>Transfers</span><span>Fund accounting</span><span>Labels</span><span>Cross-chain</span></div>';
+    const cards = rows.map(item => '<article class="capability-row" title="' + escapeAttr(item.notes) + '"><strong>' + escapeHtml(item.display_name) + '</strong><span class="capability-state ' + capabilityTone(item.transfers) + '">' + escapeHtml(item.transfers.replaceAll("_", " ")) + '</span><span class="capability-state ' + capabilityTone(item.fund_allocation) + '">' + escapeHtml(item.fund_allocation.replaceAll("_", " ")) + '</span><span class="capability-state ' + capabilityTone(item.labels) + '">' + escapeHtml(item.labels.replaceAll("_", " ")) + '</span><span class="capability-state ' + capabilityTone(item.cross_chain) + '">' + escapeHtml(item.cross_chain.replaceAll("_", " ")) + '</span><small>' + escapeHtml(item.notes) + '</small></article>').join("");
+    target.innerHTML = labels + cards;
+  } catch (error) {
+    target.innerHTML = '<p class="empty">' + escapeHtml(error.message) + '</p>';
+  }
+}
+
 async function health() {
   try {
     const result = await api("/health");
@@ -317,4 +334,5 @@ async function health() {
 
 bindEvents();
 health();
+loadCapabilities();
 loadCases();

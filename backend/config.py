@@ -34,6 +34,9 @@ class Settings:
     etherscan_min_interval_seconds: float = max(0.0, min(float(os.getenv("ETHERSCAN_MIN_INTERVAL_SECONDS", "0.38")), 5.0))
     timeout_seconds: float = max(3.0, min(float(os.getenv("TRONGRID_TIMEOUT_SECONDS", "12")), 30.0))
     requests_per_minute: int = max(30, min(int(os.getenv("REQUESTS_PER_MINUTE", "120")), 1000))
+    ml_enabled: bool = os.getenv("ML_ENABLED", "false").strip().lower() in {"1", "true", "yes", "on"}
+    ml_role_strong_threshold: float = max(0.5, min(float(os.getenv("ML_ROLE_STRONG_THRESHOLD", "0.90")), 1.0))
+    ml_role_weak_threshold: float = max(0.5, min(float(os.getenv("ML_ROLE_WEAK_THRESHOLD", "0.70")), 1.0))
 
 
 settings = Settings()

@@ -20,9 +20,9 @@ Evidence-first investigation workbench for SIH 182. The current milestone suppor
 4. Open `http://127.0.0.1:8000` for the investigation workbench.
 5. Run `E:\Python\python.exe scripts\preflight.py` before a demonstration to confirm local configuration without printing any secret.
 
-Live traces are marked `LIVE_CONFIRMED`. If a provider is unavailable or no label is supported by registry evidence, the service reports that limitation explicitly. The guided multi-hop training scenario is marked `SIMULATED_DEMO` in the UI, report data, and limitations; it cannot create a SAHYOG draft.
+Live traces are marked `LIVE_CONFIRMED`. If a provider is unavailable or no label is supported by registry evidence, the service reports that limitation explicitly. The guided multi-hop training scenario is marked `SIMULATED_DEMO` in the UI, report data, and limitations; it cannot create a SAHYOG draft. V2 analysis stores an immutable, versioned `InvestigationResult` snapshot. Its manifest, PDF, and local request draft use the same candidate, path, amount, and evidence references. Use **New v2 live trace** for a wallet-context trace from the dashboard. Transaction-seeded v2 work is available through a recorded evidence package; live transaction lookup by hash awaits a provider adapter. See `docs/BLUEPRINT_IMPLEMENTATION_STATUS.md` for the implementation boundary.
 
-`INVESTIGATOR_API_KEYS` enables bearer-key access control in deployments. Leave it empty only for local development.
+`INVESTIGATOR_API_KEYS` enables bearer-key access control in deployments. Leave it empty only for local development. `ML_ENABLED` defaults to `false`; the Phase 9 baseline can store reproducible feature snapshots and clearly marked `ML_INFERRED` evidence, but it cannot create a verified label or replace reviewed attribution evidence.
 
 ## Reviewed label packs
 
@@ -41,4 +41,12 @@ The graph dependency is bundled locally; see [third-party notices](THIRD_PARTY_N
 
 ## Deployment
 
-`deployment/docker-compose.yml` supplies a PostgreSQL 16 service and its evidence-schema migration. The present application store remains SQLite for local prototype runs; wire the supplied schema through a managed PostgreSQL repository before operational deployment.
+`deployment/docker-compose.yml` builds a self-contained prototype image, serves the frontend, and stores its SQLite evidence database in a named Docker volume. PostgreSQL is not enabled by this compose file because the application store is currently SQLite; add a tested PostgreSQL repository and migration path before a production deployment.
+
+## Cross-chain v1
+
+Cross-chain bridge continuation requires a reviewed route and an exact source-to-destination protocol message identifier. Unsupported or insufficiently evidenced bridge transfers remain explicit BRIDGE_UNRESOLVED boundaries. See docs/PHASE10_CROSS_CHAIN.md.
+
+## Phase 11 chain capability
+
+The dashboard exposes a capability matrix from GET /v2/capabilities. Ethereum, TRON, BNB Chain, and Polygon use configured transfer adapters; Bitcoin and Solana are shown as not implemented. See docs/PHASE11_ADDITIONAL_CHAINS.md.

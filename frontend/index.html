@@ -16,7 +16,15 @@
   <main class="application-shell">
     <section class="command-heading">
       <div><p class="eyebrow">LEA investigation workspace</p><h1>Trace funds. Verify the endpoint. Route the right request.</h1><p class="subtle">Confirmed transaction evidence, reviewable VASP attribution, and action drafts in one case record.</p></div>
-      <div class="heading-actions"><button id="demoCaseButton" class="button secondary">Load guided demo</button><button id="newCaseButton" class="button primary">New investigation</button></div>
+      <div class="heading-actions"><button id="newV2CaseButton" class="button primary">New v2 live trace</button><button id="v2DemoButton" class="button secondary">Load v2 evidence demo</button><button id="demoCaseButton" class="button secondary">Load guided demo</button><button id="newCaseButton" class="button primary">New investigation</button></div>
+    </section>
+
+    <section class="capability-card card" aria-labelledby="capabilityTitle">
+      <div class="capability-head">
+        <div><p class="eyebrow">Chain capability matrix</p><h2 id="capabilityTitle">What this build can analyze</h2></div>
+        <p>Adapter maturity is shown per network so investigations do not overstate chain coverage.</p>
+      </div>
+      <div id="capabilityMatrix" class="capability-matrix" aria-live="polite"><p class="empty">Loading chain capabilities…</p></div>
     </section>
 
     <section class="command-layout">
@@ -28,6 +36,36 @@
       <section class="workbench card">
         <div id="emptyState" class="empty-state"><div class="empty-icon">⌘</div><h2>Open an investigation</h2><p>Choose a case from the command centre or create a new wallet investigation.</p></div>
 
+        <section id="v2Workbench" hidden aria-live="polite">
+          <header class="v2-header">
+            <div><p class="eyebrow">Investigation result · v2</p><h2 id="v2CaseTitle">Evidence-first attribution result</h2><p id="v2CaseMeta" class="subtle"></p></div>
+            <div class="case-actions"><button id="v2ReportButton" class="button secondary">Download v2 report</button><button id="v2DraftButton" class="button primary">Create local request draft</button><button id="closeV2Button" class="button secondary">Return to investigations</button></div>
+          </header>
+          <div id="v2DataMode" class="data-mode synthetic">SYNTHETIC DEMO</div>
+          <p id="v2Limitation" class="v2-limitation"></p>
+          <section class="v2-summary-grid">
+            <article><span>Disputed value</span><strong id="v2Disputed">—</strong><small>Transaction-seeded disputed lot</small></article>
+            <article><span>Accounted to terminals</span><strong id="v2Accounted">—</strong><small>Reached a defined trace endpoint</small></article>
+            <article><span>Retained / unresolved</span><strong id="v2Unresolved">—</strong><small id="v2Retained">—</small></article>
+            <article><span>Actionable endpoints</span><strong id="v2EndpointCount">—</strong><small id="v2EndpointSummary">—</small></article>
+          </section>
+          <section class="v2-layout">
+            <div class="v2-main-panel">
+              <div class="v2-section-head"><div><p class="eyebrow">Actionable endpoints</p><h3>Where the disputed flow reached</h3></div><span class="type-badge">Evidence before routing</span></div>
+              <div id="v2Candidates" class="v2-candidate-grid"></div>
+              <div class="v2-section-head compact"><div><p class="eyebrow">Disputed-flow path</p><h3>Case-attributed transfers</h3></div></div>
+              <div id="v2Transfers" class="v2-transfer-list"></div>
+            </div>
+            <aside class="v2-evidence-panel">
+              <div class="inspector-head"><div><p class="eyebrow">Evidence drawer</p><h3>Why this claim?</h3></div><span id="v2EvidenceType" class="type-badge">None</span></div>
+              <div id="v2Evidence" class="v2-evidence-content"><p class="empty">Select an endpoint or deposit inference to inspect its evidence.</p></div>
+            </aside>
+          </section>
+          <section class="v2-inference-panel">
+            <div class="v2-section-head"><div><p class="eyebrow">Deposit infrastructure hypotheses</p><h3>Rule-based inference awaiting review</h3></div><span class="type-badge">Not an operational endpoint</span></div>
+            <div id="v2Inferences" class="v2-inference-grid"></div>
+          </section>
+        </section>
         <div id="caseView" hidden>
           <header class="case-header">
             <div><p id="caseMeta" class="eyebrow"></p><h2 id="caseTitle"></h2><p id="caseWallet" class="mono wallet"></p></div>
@@ -83,8 +121,10 @@
 
   <dialog id="caseDialog"><form id="caseForm" method="dialog"><div class="dialog-head"><div><p class="eyebrow">New investigation</p><h2>Case intake</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div><label>Case title<input name="title" required placeholder="USDT fraud investigation"></label><label>Suspect wallet<input name="suspect_wallet" required placeholder="T... or 0x..."></label><div class="form-grid"><label>Chain<select name="chain"><option value="TRON">TRON</option><option value="ETHEREUM">Ethereum</option><option value="BNB_CHAIN">BNB Chain</option><option value="POLYGON">Polygon</option></select></label><label>Asset<input name="token_symbol" value="USDT" required></label></div><div class="form-grid"><label>Disputed amount<input name="disputed_amount" type="number" min="0" step="0.000001" placeholder="Optional"></label><label>FIR number<input name="fir_number" placeholder="Optional"></label></div><label>Investigation note<textarea name="notes" rows="3" placeholder="Optional context"></textarea></label><div class="dialog-actions"><button value="cancel" class="button secondary">Cancel</button><button class="button primary" value="default">Create investigation</button></div></form></dialog>
 
+  <dialog id="v2CaseDialog"><form id="v2CaseForm" method="dialog"><div class="dialog-head"><div><p class="eyebrow">New v2 live investigation</p><h2>Wallet-context trace</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div><p class="subtle">This starts from the investigator-supplied disputed amount at the selected wallet. The saved result records this as an approximate wallet-context seed.</p><label>Case title<input name="title" required placeholder="USDT fraud wallet trace"></label><label>Wallet<input name="wallet" required placeholder="T... or 0x..."></label><div class="form-grid"><label>Chain<select name="chain"><option value="ETHEREUM">Ethereum</option><option value="TRON">TRON</option><option value="BNB_CHAIN">BNB Chain</option><option value="POLYGON">Polygon</option></select></label><label>Asset symbol<input name="symbol" value="USDT" required></label></div><div class="form-grid"><label>Token contract<input name="contract_address" placeholder="Optional for symbol-only provider retrieval"></label><label>Decimals<input name="decimals" type="number" min="0" max="36" value="6" required></label></div><div class="form-grid"><label>Disputed amount<input name="disputed_amount" type="number" min="0.000001" step="0.000001" required></label><label>Incident time<input name="incident_time" type="datetime-local" required></label></div><div class="dialog-actions"><button value="cancel" class="button secondary">Cancel</button><button class="button primary" value="default">Create and trace</button></div></form></dialog>
   <script src="/static/vendor/cytoscape.min.js"></script>
   <script src="/static/graph.js"></script>
   <script src="/static/app.js"></script>
+  <script src="/static/v2.js"></script>
 </body>
 </html>
