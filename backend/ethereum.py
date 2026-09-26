@@ -76,6 +76,47 @@ class EvmScanClient:
         self._cache[cache_key] = (monotonic(), transfers, provenance)
         return transfers, provenance
 
+    async def transaction_erc20_transfers(self, transaction_hash: str, token_symbol: str, token_contract: str | None, decimals: int) -> tuple[list[TransferEvidence], dict]:
+        """Decode confirmed ERC-20 Transfer logs from one transaction receipt."""
+        if not self.configured:
+            raise ProviderUnavailable("ETHERSCAN_API_KEY is required for live EVM transaction-seeded tracing.")
+        if not token_contract:
+            raise ProviderUnavailable("A token contract address is required for EVM transaction-seeded tracing.")
+        retrieved_at = datetime.now(timezone.utc)
+        receipt_params = {"chainid": self.chain_id, "module": "proxy", "action": "eth_getTransactionReceipt", "txhash": transaction_hash, "apikey": self.api_key}
+        async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+            receipt_body, receipt_attempts = await self._get_page(client, receipt_params)
+            receipt = receipt_body.get("result")
+            if not isinstance(receipt, dict) or not receipt.get("blockNumber"):
+                raise ProviderUnavailable("EVM provider returned no confirmed transaction receipt for the requested hash.")
+            block_params = {"chainid": self.chain_id, "module": "proxy", "action": "eth_getBlockByNumber", "tag": receipt["blockNumber"], "boolean": "false", "apikey": self.api_key}
+            block_body, block_attempts = await self._get_page(client, block_params)
+        block = block_body.get("result") or {}
+        try:
+            timestamp = datetime.fromtimestamp(int(str(block["timestamp"]), 16), tz=timezone.utc)
+            block_number = int(str(receipt["blockNumber"]), 16)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ProviderUnavailable("EVM provider returned an incomplete confirmed transaction receipt.") from exc
+        transfer_topic = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
+        transfers: list[TransferEvidence] = []
+        for log in receipt.get("logs") or []:
+            topics = log.get("topics") or []
+            if len(topics) < 3 or str(topics[0]).lower() != transfer_topic or str(log.get("address", "")).lower() != token_contract.lower():
+                continue
+            try:
+                source = "0x" + str(topics[1])[-40:].lower()
+                destination = "0x" + str(topics[2])[-40:].lower()
+                amount = Decimal(int(str(log.get("data", "0x0")), 16)) / (Decimal(10) ** decimals)
+            except (ValueError, ArithmeticError):
+                continue
+            transfers.append(TransferEvidence(
+                transaction_hash=transaction_hash, source_address=source, destination_address=destination,
+                token_symbol=token_symbol.upper(), token_contract=token_contract.lower(), amount=amount,
+                timestamp=timestamp, block_number=block_number, confirmed=True,
+                provider=f"{self.provider_name} ({self.chain_name})", retrieved_at=retrieved_at,
+            ))
+        provenance = {"provider": self.provider_name, "endpoint": self.base_url, "parameters": {"chainid": self.chain_id, "module": "proxy", "action": "eth_getTransactionReceipt", "txhash": transaction_hash}, "retrieved_at": retrieved_at.isoformat(), "accepted_records": len(transfers), "provider_attempts": receipt_attempts + block_attempts, "transaction_hash": transaction_hash, "receipt_block": block_number}
+        return transfers, provenance
     async def _get_page(self, client: httpx.AsyncClient, params: dict) -> tuple[dict, int]:
         """Fetch one page with pacing and bounded retries, without leaking the API key."""
         last_problem = "connection failure"

@@ -300,3 +300,21 @@ def test_v2_recorded_csv_import_replays_canonical_transfer():
     response = client.post("/v2/imports/recorded-trace/csv", json={"case": {"title": "CSV recorded package", "context": {"seed_type": "transaction", "chain": "ETHEREUM", "seed_tx_hash": seed_hash, "asset": asset, "disputed_amount": "25", "incident_time": "2026-09-26T09:00:00Z", "data_mode": "RECORDED_REAL"}}, "transfers_csv": csv_text})
     assert response.status_code == 201, response.text
     assert response.json()["transfers"][0]["id"] == "CSV-SEED"
+
+
+def test_evm_transaction_seed_decodes_matching_erc20_transfer_log():
+    import asyncio
+    from backend.ethereum import EvmScanClient
+
+    class FakeEvmClient(EvmScanClient):
+        async def _get_page(self, client, params):
+            if params["action"] == "eth_getTransactionReceipt":
+                return {"result": {"blockNumber": "0x10", "logs": [{"address": "0x" + "a" * 40, "topics": ["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef", "0x" + "0" * 24 + "b" * 40, "0x" + "0" * 24 + "c" * 40], "data": "0x0f4240"}]}}, 1
+            return {"result": {"timestamp": "0x69c60000"}}, 1
+
+    client = FakeEvmClient(api_key="test")
+    transfers, provenance = asyncio.run(client.transaction_erc20_transfers("0x" + "d" * 64, "USDT", "0x" + "a" * 40, 6))
+    assert len(transfers) == 1
+    assert str(transfers[0].amount) == "1"
+    assert transfers[0].source_address == "0x" + "b" * 40
+    assert provenance["receipt_block"] == 16

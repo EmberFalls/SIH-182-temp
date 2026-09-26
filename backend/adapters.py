@@ -34,9 +34,12 @@ class LegacyExplorerAdapter:
         return ProviderAdapterResult(provider=str(provenance.get("provider", "unknown")), chain=self.chain, transfers=canonical, evidence=evidence, complete=complete, warnings=warnings)
 
     async def transaction_transfers(self, transaction_hash: str, asset: AssetRef) -> ProviderAdapterResult:
-        if self.chain != Chain.TRON or not hasattr(self.client, "transaction_trc20_transfers"):
+        if self.chain == Chain.TRON and hasattr(self.client, "transaction_trc20_transfers"):
+            transfers, provenance = await self.client.transaction_trc20_transfers(transaction_hash, asset.symbol, asset.contract_address, asset.decimals)
+        elif self.chain in {Chain.ETHEREUM, Chain.BNB_CHAIN, Chain.POLYGON} and hasattr(self.client, "transaction_erc20_transfers"):
+            transfers, provenance = await self.client.transaction_erc20_transfers(transaction_hash, asset.symbol, asset.contract_address, asset.decimals)
+        else:
             raise ProviderUnavailable(f"{self.chain.value} does not yet provide token Transfer events by transaction hash.")
-        transfers, provenance = await self.client.transaction_trc20_transfers(transaction_hash, asset.symbol, asset.contract_address, asset.decimals)
         evidence = self._evidence(provenance)
         canonical = [self._transfer(item, evidence.id, index) for index, item in enumerate(transfers)]
         return ProviderAdapterResult(provider=str(provenance.get("provider", "unknown")), chain=self.chain, transfers=canonical, evidence=evidence, complete=True, warnings=[])
