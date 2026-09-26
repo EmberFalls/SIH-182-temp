@@ -70,6 +70,11 @@ CREATE TABLE IF NOT EXISTS model_inferences_v2 (
 );
 CREATE INDEX IF NOT EXISTS model_inferences_v2_snapshot_idx ON model_inferences_v2 (feature_snapshot_id, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS vasp_readiness_profiles_v2 (
+  id TEXT PRIMARY KEY, entity_id TEXT NOT NULL UNIQUE, review_state TEXT NOT NULL,
+  payload JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL
+);
+CREATE INDEX IF NOT EXISTS vasp_readiness_profiles_v2_entity_idx ON vasp_readiness_profiles_v2 (entity_id, created_at DESC);
 CREATE TABLE IF NOT EXISTS bridge_routes_v2 (
   id TEXT PRIMARY KEY, bridge_entity_id TEXT NOT NULL, protocol TEXT NOT NULL,
   source_chain TEXT NOT NULL, destination_chain TEXT NOT NULL, payload JSONB NOT NULL, created_at TIMESTAMPTZ NOT NULL

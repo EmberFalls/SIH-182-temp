@@ -318,3 +318,39 @@ def test_evm_transaction_seed_decodes_matching_erc20_transfer_log():
     assert str(transfers[0].amount) == "1"
     assert transfers[0].source_address == "0x" + "b" * 40
     assert provenance["receipt_block"] == 16
+
+
+def test_actionability_envelope_blocks_then_enables_local_request_with_reviewed_profile():
+    asset = {"chain": "ETHEREUM", "symbol": "USDT", "contract_address": "0x" + "8" * 40, "decimals": 6}
+    root, victim, collector = "0x" + "1" * 40, "0x" + "2" * 40, "0x" + "3" * 40
+    source = client.post("/v2/intelligence/sources", json={"name": "Actionability source", "source_type": "VASP_PUBLISHED", "trust_tier": "A", "retrieved_at": "2026-09-26T10:00:00Z"}).json()
+    entity = client.post("/v2/intelligence/entities", json={"canonical_name": "Actionability Exchange", "entity_type": "VASP"}).json()
+    client.post("/v2/intelligence/assertions", json={
+        "entity_id": entity["id"], "address": collector, "chain": "ETHEREUM", "role": "VASP_COLLECTOR",
+        "assertion_type": "VERIFIED", "source_id": source["id"], "review_state": "REVIEWED", "last_verified_at": "2026-09-26T10:00:00Z",
+    })
+    case = client.post("/v2/cases", json={"title": "Actionability case", "context": {
+        "seed_type": "transaction", "chain": "ETHEREUM", "seed_tx_hash": "0x" + "4" * 64, "asset": asset,
+        "disputed_amount": "100", "incident_time": "2026-09-26T10:00:00Z", "data_mode": "RECORDED_REAL",
+    }}).json()
+    transfers = [
+        {"id": "ACTION-SEED", "transaction_id": "TX-ETHEREUM-0x" + "4" * 64, "chain": "ETHEREUM", "source_address": victim, "destination_address": root, "asset": asset, "raw_amount": "100", "normalized_amount": "100", "timestamp": "2026-09-26T10:00:00Z", "raw_evidence_id": "EVID-ACTION-1"},
+        {"id": "ACTION-ENDPOINT", "transaction_id": "TX-ACTION-ENDPOINT", "chain": "ETHEREUM", "source_address": root, "destination_address": collector, "asset": asset, "raw_amount": "100", "normalized_amount": "100", "timestamp": "2026-09-26T10:05:00Z", "raw_evidence_id": "EVID-ACTION-2"},
+    ]
+    trace_response = client.post(f"/v2/cases/{case['id']}/trace", json={"recorded_transfers": transfers})
+    assert trace_response.status_code == 201, trace_response.text
+    result = trace_response.json()
+    before = client.get(f"/v2/results/{result['id']}/actionability")
+    assert before.status_code == 200
+    assert before.json()["candidates"][0]["recommendation"] == "COLLECT_MORE_EVIDENCE"
+    assert before.json()["candidates"][0]["envelope"]["maximum_request_amount"] == "0"
+    profile = client.post("/v2/vasp-readiness-profiles", json={
+        "entity_id": entity["id"], "supported_chains": ["ETHEREUM"], "local_contact_route": "LOCAL_DEMO_ROUTE",
+        "template_version": "demo-v1", "review_state": "REVIEWED",
+    })
+    assert profile.status_code == 201
+    after = client.get(f"/v2/results/{result['id']}/actionability")
+    assert after.status_code == 200
+    candidate = after.json()["candidates"][0]
+    assert candidate["recommendation"] == "READY_FOR_LOCAL_DRAFT"
+    assert candidate["envelope"]["maximum_request_amount"] == "100"

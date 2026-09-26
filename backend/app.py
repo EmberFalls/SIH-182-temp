@@ -27,6 +27,11 @@ from .cross_chain_v2 import (
     new_bridge_route,
 )
 from .v2_demo import V2DemoScenarioService
+from .actionability_v2 import (
+    ActionabilityAssessmentV2, ActionabilityEngineV2, VaspReadinessProfileCreateV2,
+    VaspReadinessProfileV2, new_vasp_readiness_profile_v2,
+)
+from .wormhole import WormholeEvmExtractionRequestV2, WormholeEvmMessageCollectorV2
 from .bridge_events import (
     BridgeEventExtractionRequestV2,
     BridgeEventResolveRequestV2,
@@ -274,6 +279,10 @@ async def retry_v2_trace_job(job_id: str, request: Request) -> dict:
     audit(request, "V2_TRACE_JOB_RETRIED", job_id, {"case_id": case.id, "attempt": job["attempt"]})
     return job
 
+@app.get("/v2/trace-jobs")
+def list_v2_trace_jobs(case_id: str | None = None) -> list[dict]:
+    return store.list_v2_trace_jobs(case_id)
+
 @app.get("/v2/trace-jobs/{job_id}")
 def get_v2_trace_job(job_id: str) -> dict:
     job = store.get_v2_trace_job(job_id)
@@ -322,6 +331,21 @@ def extract_bridge_event_v2(payload: BridgeEventExtractionRequestV2, request: Re
     })
     return saved
 
+
+@app.post("/v2/bridges/wormhole/evm-extract", response_model=BridgeEventV2, status_code=status.HTTP_201_CREATED)
+def extract_wormhole_evm_event_v2(payload: WormholeEvmExtractionRequestV2, request: Request) -> BridgeEventV2:
+    """Decode Wormhole's exact VAA identifier from retained EVM receipt logs."""
+    require_role(request, "investigator", "supervisor", "admin")
+    artifact = store.get_raw_evidence_artifact_v2(payload.raw_evidence_id)
+    if not artifact:
+        raise HTTPException(status_code=404, detail="Raw evidence artifact not found")
+    try:
+        event = WormholeEvmMessageCollectorV2().extract(artifact, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    saved = store.save_bridge_event_v2(event)
+    audit(request, "WORMHOLE_EVM_EVENT_EXTRACTED", saved.id, {"raw_evidence_id": saved.raw_evidence_id, "message_id": saved.message_id})
+    return saved
 
 @app.get("/v2/bridges/events", response_model=list[BridgeEventV2])
 def list_bridge_events_v2(protocol: str | None = None, message_id: str | None = None) -> list[BridgeEventV2]:
@@ -515,6 +539,32 @@ def get_investigation_result_v2(result_id: str) -> InvestigationResultV2:
         raise HTTPException(status_code=404, detail="V2 investigation result not found")
     return result
 
+
+@app.get("/v2/results/{result_id}/actionability", response_model=ActionabilityAssessmentV2)
+def assess_result_actionability_v2(result_id: str) -> ActionabilityAssessmentV2:
+    result = store.get_investigation_result_v2(result_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Investigation result not found")
+    return ActionabilityEngineV2(store).assess(result)
+
+
+@app.post("/v2/vasp-readiness-profiles", response_model=VaspReadinessProfileV2, status_code=status.HTTP_201_CREATED)
+def create_vasp_readiness_profile_v2(payload: VaspReadinessProfileCreateV2, request: Request) -> VaspReadinessProfileV2:
+    require_role(request, "label_reviewer", "supervisor", "admin")
+    entity = store.get_entity(payload.entity_id)
+    if not entity or entity.entity_type.value != "VASP":
+        raise HTTPException(status_code=422, detail="entity_id must reference a registered VASP entity.")
+    try:
+        profile = store.save_vasp_readiness_profile_v2(new_vasp_readiness_profile_v2(payload))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    audit(request, "VASP_READINESS_PROFILE_CREATED", profile.id, {"entity_id": profile.entity_id, "review_state": profile.review_state.value})
+    return profile
+
+
+@app.get("/v2/vasp-readiness-profiles", response_model=list[VaspReadinessProfileV2])
+def list_vasp_readiness_profiles_v2() -> list[VaspReadinessProfileV2]:
+    return store.list_vasp_readiness_profiles_v2()
 
 @app.get("/v2/results/{result_id}/evidence-manifest")
 def get_investigation_result_manifest_v2(result_id: str) -> dict:

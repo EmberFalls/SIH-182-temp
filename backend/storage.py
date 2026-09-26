@@ -25,6 +25,7 @@ from .domain import (
     ResolvedEntityAssertion,
     TrustTier,
 )
+from .actionability_v2 import VaspReadinessProfileV2
 from .bridge_events import BridgeEventV2
 from .cross_chain_v2 import BridgeRouteV2, CrossChainLinkV2
 from .models import CaseCreate, CaseNote, CaseSummary, CaseUpdate, LabelReview, LabelReviewEvent, VaspLabel, VaspLabelCreate
@@ -151,7 +152,12 @@ class Store:
                 );
                 CREATE INDEX IF NOT EXISTS model_inferences_v2_snapshot_idx
                     ON model_inferences_v2(feature_snapshot_id, created_at DESC);
-                CREATE TABLE IF NOT EXISTS bridge_routes_v2 (
+                CREATE TABLE IF NOT EXISTS vasp_readiness_profiles_v2 (
+                    id TEXT PRIMARY KEY, entity_id TEXT NOT NULL UNIQUE, review_state TEXT NOT NULL,
+                    payload TEXT NOT NULL, created_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS vasp_readiness_profiles_v2_entity_idx
+                    ON vasp_readiness_profiles_v2(entity_id, created_at DESC);                CREATE TABLE IF NOT EXISTS bridge_routes_v2 (
                     id TEXT PRIMARY KEY, bridge_entity_id TEXT NOT NULL, protocol TEXT NOT NULL,
                     source_chain TEXT NOT NULL, destination_chain TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL
                 );
@@ -298,6 +304,29 @@ class Store:
             row = connection.execute("SELECT payload FROM model_inferences_v2 WHERE id = ?", (inference_id,)).fetchone()
         return ModelInferenceV2.model_validate_json(row["payload"]) if row else None
 
+    def save_vasp_readiness_profile_v2(self, profile: VaspReadinessProfileV2) -> VaspReadinessProfileV2:
+        if not self.get_entity(profile.entity_id):
+            raise ValueError("VASP readiness profile references an entity that does not exist.")
+        with self._connection() as connection:
+            existing = connection.execute("SELECT payload FROM vasp_readiness_profiles_v2 WHERE entity_id = ?", (profile.entity_id,)).fetchone()
+            if existing:
+                return VaspReadinessProfileV2.model_validate_json(existing["payload"])
+            connection.execute(
+                "INSERT INTO vasp_readiness_profiles_v2 VALUES (?, ?, ?, ?, ?)",
+                (profile.id, profile.entity_id, profile.review_state.value,
+                 json.dumps(profile.model_dump(mode="json"), default=_json_default, sort_keys=True), profile.created_at.isoformat()),
+            )
+        return profile
+
+    def get_vasp_readiness_profile_v2(self, entity_id: str) -> VaspReadinessProfileV2 | None:
+        with self._connection() as connection:
+            row = connection.execute("SELECT payload FROM vasp_readiness_profiles_v2 WHERE entity_id = ?", (entity_id,)).fetchone()
+        return VaspReadinessProfileV2.model_validate_json(row["payload"]) if row else None
+
+    def list_vasp_readiness_profiles_v2(self) -> list[VaspReadinessProfileV2]:
+        with self._connection() as connection:
+            rows = connection.execute("SELECT payload FROM vasp_readiness_profiles_v2 ORDER BY created_at DESC").fetchall()
+        return [VaspReadinessProfileV2.model_validate_json(row["payload"]) for row in rows]
     def save_bridge_route_v2(self, route: BridgeRouteV2) -> BridgeRouteV2:
         with self._connection() as connection:
             existing = connection.execute("SELECT payload FROM bridge_routes_v2 WHERE id = ?", (route.id,)).fetchone()
@@ -483,6 +512,11 @@ class Store:
             connection.execute("INSERT OR REPLACE INTO v2_trace_jobs VALUES (?, ?, ?)", (job["job_id"], json.dumps(job, default=_json_default, sort_keys=True), job["created_at"]))
         return job
 
+    def list_v2_trace_jobs(self, case_id: str | None = None) -> list[dict]:
+        with self._connection() as connection:
+            rows = connection.execute("SELECT payload FROM v2_trace_jobs ORDER BY created_at DESC").fetchall()
+        jobs = [json.loads(row["payload"]) for row in rows]
+        return [job for job in jobs if case_id is None or job.get("case_id") == case_id]
     def get_v2_trace_job(self, job_id: str) -> dict | None:
         with self._connection() as connection:
             row = connection.execute("SELECT payload FROM v2_trace_jobs WHERE id = ?", (job_id,)).fetchone()

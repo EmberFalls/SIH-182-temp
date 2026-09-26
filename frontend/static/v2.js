@@ -71,10 +71,29 @@
     const inferences = result.deposit_inferences || [];
     q("#v2Inferences").innerHTML = inferences.length ? inferences.map(inference => `<button class="v2-inference-card" data-inference="${escapeHtml(inference.id)}"><span class="claim-state inferred">Rule inferred · awaiting review</span><strong>Probable ${escapeHtml(inference.candidate_entity_name)} deposit endpoint</strong><p><code>${escapeHtml(short(inference.address))}</code> · ${inference.evidence_score}/100 rule evidence</p><small>${escapeHtml(inference.reasons[0] || "No explanation recorded.")}</small></button>`).join("") : '<p class="empty">No deposit-pattern hypothesis was generated.</p>';
     q("#v2Inferences").querySelectorAll("[data-inference]").forEach(button => button.onclick = () => showInference(inferences.find(item => item.id === button.dataset.inference)));
+    renderActionability(result.id, asset);
     q("#v2EvidenceType").textContent = "None";
     q("#v2Evidence").innerHTML = '<p class="empty">Select an endpoint or deposit inference to inspect its evidence.</p>';
   }
 
+  async function renderActionability(resultId, asset) {
+    const target = q("#v2Actionability");
+    if (!target || !resultId) return;
+    target.innerHTML = '<p class="empty">Checking route readiness and evidence challenges…</p>';
+    try {
+      const assessment = await request(`/v2/results/${resultId}/actionability`, { method: "GET" });
+      if (resultState?.id !== resultId) return;
+      target.innerHTML = assessment.candidates.length ? assessment.candidates.map(item => {
+        const amount = `${money(item.envelope.maximum_request_amount)} ${escapeHtml(asset)}`;
+        const status = item.recommendation.replaceAll("_", " ");
+        const challenges = item.challenges.length ? item.challenges.map(challenge => `<li><b>${escapeHtml(challenge.severity)}</b> · ${escapeHtml(challenge.claim)}<small>${escapeHtml(challenge.resolution)}</small></li>`).join("") : '<li>No unresolved challenge was found.</li>';
+        const next = item.next_best_evidence.length ? item.next_best_evidence.map(step => `<li>${escapeHtml(step.action)}</li>`).join("") : '<li>Proceed to investigator and legal review.</li>';
+        return `<article class="v2-inference-card actionability-card"><span class="claim-state ${escapeHtml(item.recommendation.toLowerCase())}">${escapeHtml(status)}</span><strong>${escapeHtml(item.entity_name)}</strong><p><b>${amount}</b> maximum local request amount · ${escapeHtml(item.route_state.replaceAll("_", " "))} routing profile</p><small>Confirmed: ${money(item.envelope.confirmed_attributed_amount)} · Model estimate: ${money(item.envelope.model_attributed_amount)} · Unresolved case value: ${money(item.envelope.unresolved_case_amount)}</small><details><summary>Challenge the conclusion (${item.challenges.length})</summary><ul class="actionability-list">${challenges}</ul></details><details open><summary>Next best evidence</summary><ol class="actionability-list">${next}</ol></details></article>`;
+      }).join("") : '<p class="empty">No VASP candidate is eligible for an actionability assessment.</p>';
+    } catch (error) {
+      target.innerHTML = `<p class="empty">Actionability assessment unavailable: ${escapeHtml(error.message)}</p>`;
+    }
+  }
   async function load() {
     try {
       render(await request("/demo/scenarios/v2-deposit-inference"));
@@ -144,6 +163,72 @@
       submit.disabled = false;
     }
   }
+  function notice(text, type = "success") {
+    const target = q("#notice");
+    if (target) { target.hidden = false; target.className = `notice ${type}`; target.textContent = text; }
+  }
+
+  async function lookupIntelligence(event) {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(event.target));
+    const target = q("#intelligenceReviewResults");
+    target.innerHTML = '<p class="empty">Loading assertions…</p>';
+    try {
+      const entries = await request(`/v2/intelligence/assertions?address=${encodeURIComponent(values.address.trim())}&chain=${encodeURIComponent(values.chain)}`, { method: "GET" });
+      target.innerHTML = entries.length ? entries.map(item => `<article class="v2-inference-card"><span class="claim-state ${escapeHtml(item.effective_review_state.toLowerCase())}">${escapeHtml(item.effective_review_state)}</span><strong>${escapeHtml(item.entity.canonical_name)}</strong><p><code>${escapeHtml(short(item.assertion.address))}</code> · ${escapeHtml(item.assertion.role.replaceAll("_", " "))}</p><small>${escapeHtml(item.source.name)} · ${escapeHtml(item.source.trust_tier)} tier · ${escapeHtml(item.assertion.assertion_type)}</small><div class="dialog-actions"><button class="button secondary small" data-review-assertion="${escapeHtml(item.assertion.id)}" data-review-state="REVIEWED">Approve</button><button class="button secondary small" data-review-assertion="${escapeHtml(item.assertion.id)}" data-review-state="REJECTED">Reject</button></div></article>`).join("") : '<p class="empty">No assertions exist for this address and chain.</p>';
+      target.querySelectorAll("[data-review-assertion]").forEach(button => button.onclick = async () => {
+        const rationale = window.prompt(`${button.dataset.reviewState === "REVIEWED" ? "Approve" : "Reject"} rationale (minimum 3 characters):`);
+        if (!rationale) return;
+        try {
+          await request(`/v2/intelligence/assertions/${button.dataset.reviewAssertion}/reviews`, { body: JSON.stringify({ review_state: button.dataset.reviewState, rationale }) });
+          notice(`Assertion ${button.dataset.reviewState.toLowerCase()} and review history saved.`);
+          event.target.requestSubmit();
+        } catch (error) { notice(error.message, "error"); }
+      });
+    } catch (error) { target.innerHTML = `<p class="empty">Could not load assertions: ${escapeHtml(error.message)}</p>`; }
+  }
+
+  async function extractBridgeEvent(event) {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(event.target));
+    const target = q("#bridgeWorkflowResults");
+    try {
+      const transfer = JSON.parse(values.transfer_json);
+      let result;
+      if (values.mode === "wormhole") {
+        result = await request("/v2/bridges/wormhole/evm-extract", { body: JSON.stringify({ raw_evidence_id: values.raw_evidence_id, transfer, wormhole_chain_id: Number(values.protocol), core_contract: values.core_contract }) });
+      } else {
+        result = await request("/v2/bridges/events/extract", { body: JSON.stringify({ protocol: values.protocol, direction: values.direction, raw_evidence_id: values.raw_evidence_id, transfer }) });
+      }
+      target.innerHTML = `<article class="v2-inference-card"><span class="claim-state verified">Exact event retained</span><strong>${escapeHtml(result.protocol)} · ${escapeHtml(result.direction)}</strong><p>Message ID: <code>${escapeHtml(result.message_id)}</code></p><small>Saved event ID: ${escapeHtml(result.id)}. Use this ID in the exact-event resolution form.</small></article>`;
+      notice("Bridge event extracted from retained evidence.");
+    } catch (error) { target.innerHTML = `<p class="empty">Bridge extraction failed: ${escapeHtml(error.message)}</p>`; }
+  }
+
+  async function resolveBridgeEvents(event) {
+    event.preventDefault();
+    const values = Object.fromEntries(new FormData(event.target));
+    const target = q("#bridgeWorkflowResults");
+    try {
+      const link = await request("/v2/cross-chain/links/resolve-events", { body: JSON.stringify(values) });
+      target.innerHTML = `<article class="v2-inference-card"><span class="claim-state verified">Verified cross-chain link</span><strong>${escapeHtml(link.protocol)} route resolved</strong><p>${escapeHtml(link.source_chain)} → ${escapeHtml(link.destination_chain)} · message <code>${escapeHtml(link.message_id)}</code></p><small>Destination continuation is now evidence-bound. Link ID: ${escapeHtml(link.id)}</small></article>`;
+      notice("Exact bridge-event pair verified.");
+    } catch (error) { target.innerHTML = `<p class="empty">Bridge resolution failed: ${escapeHtml(error.message)}</p>`; }
+  }
+
+  async function loadCaseHistory() {
+    const target = q("#caseHistoryResults");
+    target.innerHTML = '<p class="empty">Loading saved investigation history…</p>';
+    try {
+      const cases = await request("/v2/cases", { method: "GET" });
+      const rows = await Promise.all(cases.map(async item => ({ item, results: await request(`/v2/cases/${item.id}/results`, { method: "GET" }), jobs: await request(`/v2/trace-jobs?case_id=${encodeURIComponent(item.id)}`, { method: "GET" }) })));
+      target.innerHTML = rows.length ? rows.map(({ item, results, jobs }) => `<div class="v2-transfer-row"><span><b>${escapeHtml(item.title)}</b><small>${escapeHtml(item.status)} · ${escapeHtml(item.context.data_mode)}</small></span><span>${results.length} saved result${results.length === 1 ? "" : "s"} · ${jobs.length} trace job${jobs.length === 1 ? "" : "s"}</span><span>${results.map(result => `<button class="button secondary small" data-open-result="${escapeHtml(result.id)}" data-case-id="${escapeHtml(item.id)}">Open v${result.version}</button>`).join(" ") || "No result yet"}</span></div>`).join("") : '<p class="empty">No v2 investigations have been saved yet.</p>';
+      target.querySelectorAll("[data-open-result]").forEach(button => button.onclick = async () => {
+        const [result, caseRecord] = await Promise.all([request(`/v2/results/${button.dataset.openResult}`, { method: "GET" }), request(`/v2/cases/${button.dataset.caseId}`, { method: "GET" })]);
+        q("#caseHistoryDialog").close(); render({ ...result, case: caseRecord });
+      });
+    } catch (error) { target.innerHTML = `<p class="empty">Could not load case history: ${escapeHtml(error.message)}</p>`; }
+  }
   async function createLiveCase(event) {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(event.target));
@@ -194,6 +279,12 @@
   }
 
   q("#importRecordedButton")?.addEventListener("click", () => q("#recordedImportDialog").showModal());
+  q("#reviewIntelligenceButton")?.addEventListener("click", () => q("#intelligenceReviewDialog").showModal());
+  q("#bridgeWorkflowButton")?.addEventListener("click", () => q("#bridgeWorkflowDialog").showModal());
+  q("#caseHistoryButton")?.addEventListener("click", () => { q("#caseHistoryDialog").showModal(); loadCaseHistory(); });
+  q("#intelligenceLookupForm")?.addEventListener("submit", lookupIntelligence);
+  q("#bridgeExtractForm")?.addEventListener("submit", extractBridgeEvent);
+  q("#bridgeResolveForm")?.addEventListener("submit", resolveBridgeEvents);
   q("#importCsvButton")?.addEventListener("click", () => q("#csvImportDialog").showModal());
   q("#intelligenceImportButton")?.addEventListener("click", () => q("#intelligenceImportDialog").showModal());
   q("#recordedImportForm")?.addEventListener("submit", importRecordedPackage);

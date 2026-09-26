@@ -270,3 +270,28 @@ def test_reconcile_interrupted_trace_job_preserves_retry_payload(tmp_path):
     assert recovered["status"] == "INTERRUPTED"
     assert recovered["case_id"] == job["case_id"]
     assert recovered["trace_request"] == job["trace_request"]
+
+
+def test_wormhole_evm_collector_decodes_exact_vaa_id_from_retained_receipt_log():
+    from backend.canonical import canonical_sha256
+    from backend.domain import RawEvidenceArtifact
+    from backend.wormhole import LOG_MESSAGE_PUBLISHED_TOPIC
+
+    item = transfer("WORMHOLE-SOURCE", Chain.ETHEREUM, SOURCE_USER, SOURCE_BRIDGE, SOURCE_ASSET, "10", 1)
+    core = "0x" + "9" * 40
+    emitter = "a" * 40
+    data = "0x" + f"{77:064x}" + f"{5:064x}" + f"{128:064x}" + f"{1:064x}"
+    app_module.store.save_raw_evidence_artifact_v2(RawEvidenceArtifact(
+        id=item.raw_evidence_id, kind="provider_response", provider="fixture_evm", retrieved_at=NOW,
+        content_hash_sha256=canonical_sha256({"id": item.raw_evidence_id}),
+        metadata={"receipt_logs": [{"address": core, "topics": [LOG_MESSAGE_PUBLISHED_TOPIC, "0x" + "0" * 24 + emitter], "data": data}]},
+    ))
+    response = client.post("/v2/bridges/wormhole/evm-extract", json={
+        "raw_evidence_id": item.raw_evidence_id, "transfer": item.model_dump(mode="json"),
+        "wormhole_chain_id": 2, "core_contract": core,
+    })
+    assert response.status_code == 201, response.text
+    event = response.json()
+    assert event["protocol"] == "WORMHOLE"
+    assert event["message_id"] == f"2/{emitter}/77"
+    assert event["metadata"]["nonce"] == "5"

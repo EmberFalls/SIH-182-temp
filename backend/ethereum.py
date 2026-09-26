@@ -115,7 +115,7 @@ class EvmScanClient:
                 timestamp=timestamp, block_number=block_number, confirmed=True,
                 provider=f"{self.provider_name} ({self.chain_name})", retrieved_at=retrieved_at,
             ))
-        provenance = {"provider": self.provider_name, "endpoint": self.base_url, "parameters": {"chainid": self.chain_id, "module": "proxy", "action": "eth_getTransactionReceipt", "txhash": transaction_hash}, "retrieved_at": retrieved_at.isoformat(), "accepted_records": len(transfers), "provider_attempts": receipt_attempts + block_attempts, "transaction_hash": transaction_hash, "receipt_block": block_number}
+        provenance = {"provider": self.provider_name, "endpoint": self.base_url, "parameters": {"chainid": self.chain_id, "module": "proxy", "action": "eth_getTransactionReceipt", "txhash": transaction_hash}, "retrieved_at": retrieved_at.isoformat(), "accepted_records": len(transfers), "provider_attempts": receipt_attempts + block_attempts, "transaction_hash": transaction_hash, "receipt_block": block_number, "receipt_logs": receipt.get("logs") or []}
         return transfers, provenance
     async def _get_page(self, client: httpx.AsyncClient, params: dict) -> tuple[dict, int]:
         """Fetch one page with pacing and bounded retries, without leaking the API key."""

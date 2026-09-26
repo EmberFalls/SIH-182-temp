@@ -8,6 +8,8 @@ Evidence-first investigation workbench for SIH 182. The current milestone suppor
 - source provenance, deterministic evidence manifests, and a tamper-evident hash;
 - a reviewed VASP label registry that never treats an unsourced label as verified.
 - conservative disputed-fund allocation, risk flags, cross-case leads, and bridge boundaries;
+- a Defensible Action Centre that bounds the proposed local request amount, challenges weak evidence, recommends the next evidence step, and checks local VASP routing readiness;
+- visible intelligence review, bridge-event evidence, and saved-case history workflows;
 - draft-only SAHYOG request packets, audit records, background trace jobs, and PDF reports.
 - an interactive local Cytoscape.js transaction graph with path highlighting, node/edge evidence inspection, and trace-frontier coverage gaps;
 - a clearly marked `SIMULATED_DEMO` multi-hop scenario for judging and training, with operational drafting disabled.
@@ -23,6 +25,10 @@ Evidence-first investigation workbench for SIH 182. The current milestone suppor
 Live traces are marked `LIVE_CONFIRMED`. If a provider is unavailable or no label is supported by registry evidence, the service reports that limitation explicitly. The guided multi-hop training scenario is marked `SIMULATED_DEMO` in the UI, report data, and limitations; it cannot create a SAHYOG draft. V2 analysis stores an immutable, versioned `InvestigationResult` snapshot. Its manifest, PDF, and local request draft use the same candidate, path, amount, and evidence references. Use **New v2 live trace** for a wallet-context trace from the dashboard. Use **Import JSON package** or **Import trace CSV** to replay locally held evidence. **Import intelligence CSV** adds source-backed entity assertions for review. Transaction-seeded v2 work supports recorded evidence, confirmed TRON TRC-20 event retrieval, and confirmed EVM ERC-20 receipt Transfer-log decoding on Ethereum, BNB Chain, and Polygon when a token contract is supplied. See `docs/BLUEPRINT_IMPLEMENTATION_STATUS.md` for the implementation boundary.
 
 `INVESTIGATOR_API_KEYS` enables bearer-key access control in deployments. Leave it empty only for local development. `ML_ENABLED` defaults to `false`; the Phase 9 baseline can store reproducible feature snapshots and clearly marked `ML_INFERRED` evidence, but it cannot create a verified label or replace reviewed attribution evidence.
+
+## Public intelligence packs
+
+`scripts/build_ofac_crypto_pack.py` builds a source-preserving, unreviewed public-risk address queue from OFAC's public SDN export. It does not make VASP ownership claims; review each assertion locally before use. See [intelligence pack guidance](intelligence_packs/README.md).
 
 ## Reviewed label packs
 
