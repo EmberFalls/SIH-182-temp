@@ -254,3 +254,19 @@ def test_bridge_event_extraction_rejects_evidence_without_exact_message():
     })
     assert response.status_code == 422
     assert "message" in response.json()["detail"].lower()
+
+
+def test_reconcile_interrupted_trace_job_preserves_retry_payload(tmp_path):
+    from backend.jobs_v2 import PersistentTraceJobsV2
+
+    store = Store(str(tmp_path / "jobs.db"))
+    job = {
+        "job_id": "V2JOB-INTERRUPTED", "status": "RUNNING", "created_at": NOW.isoformat(),
+        "case_id": "CASEV2-TEST", "trace_request": {"recorded_transfers": []}, "result_id": None, "attempt": 1,
+    }
+    store.save_v2_trace_job(job)
+    assert PersistentTraceJobsV2(store).reconcile_interrupted() == 1
+    recovered = store.get_v2_trace_job(job["job_id"])
+    assert recovered["status"] == "INTERRUPTED"
+    assert recovered["case_id"] == job["case_id"]
+    assert recovered["trace_request"] == job["trace_request"]

@@ -250,10 +250,29 @@ async def start_v2_trace_job(case_id: str, payload: InvestigationTraceRequestV2,
     case = store.get_investigation_case_v2(case_id)
     if not case:
         raise HTTPException(status_code=404, detail="V2 investigation case not found")
-    job = PersistentTraceJobsV2(store).submit(lambda: InvestigationRunnerV2(store, _v2_explorer_adapter).run(case, payload))
+    job = PersistentTraceJobsV2(store).submit(case.id, payload.model_dump(mode="json"), lambda: InvestigationRunnerV2(store, _v2_explorer_adapter).run(case, payload))
     audit(request, "V2_TRACE_JOB_CREATED", job["job_id"], {"case_id": case_id})
     return job
 
+
+@app.post("/v2/trace-jobs/{job_id}/retry", status_code=status.HTTP_202_ACCEPTED)
+async def retry_v2_trace_job(job_id: str, request: Request) -> dict:
+    require_role(request, "investigator", "supervisor", "admin")
+    existing = store.get_v2_trace_job(job_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="V2 trace job not found")
+    case = store.get_investigation_case_v2(existing.get("case_id", ""))
+    if not case:
+        raise HTTPException(status_code=422, detail="The trace job's source case is no longer available.")
+    try:
+        payload = InvestigationTraceRequestV2.model_validate(existing.get("trace_request"))
+        job = PersistentTraceJobsV2(store).retry(job_id, lambda: InvestigationRunnerV2(store, _v2_explorer_adapter).run(case, payload))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not job:
+        raise HTTPException(status_code=404, detail="V2 trace job not found")
+    audit(request, "V2_TRACE_JOB_RETRIED", job_id, {"case_id": case.id, "attempt": job["attempt"]})
+    return job
 
 @app.get("/v2/trace-jobs/{job_id}")
 def get_v2_trace_job(job_id: str) -> dict:

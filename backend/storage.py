@@ -488,6 +488,13 @@ class Store:
             row = connection.execute("SELECT payload FROM v2_trace_jobs WHERE id = ?", (job_id,)).fetchone()
         return json.loads(row["payload"]) if row else None
 
+    def list_v2_trace_jobs_by_status(self, statuses: list[str]) -> list[dict]:
+        if not statuses:
+            return []
+        with self._connection() as connection:
+            rows = connection.execute("SELECT payload FROM v2_trace_jobs ORDER BY created_at ASC").fetchall()
+        jobs = [json.loads(row["payload"]) for row in rows]
+        return [job for job in jobs if job.get("status") in set(statuses)]
     def update_v2_trace_job(self, job_id: str, changes: dict) -> dict | None:
         job = self.get_v2_trace_job(job_id)
         if not job:
