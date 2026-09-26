@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from math import exp, log
 from statistics import median
@@ -62,6 +62,7 @@ class WalletFeatureExtractor:
         transfers: Iterable[CanonicalTransfer],
         snapshot_time: datetime,
         *,
+        lookback_hours: int | None = None,
         source_block_start: int | None = None,
         source_block_end: int | None = None,
         created_at: datetime | None = None,
@@ -69,9 +70,9 @@ class WalletFeatureExtractor:
         if snapshot_time.tzinfo is None:
             raise ValueError("snapshot_time must include a timezone.")
         normalized = normalize_address(asset.chain, address)
+        window_start = snapshot_time - timedelta(hours=lookback_hours) if lookback_hours else None
         relevant = sorted(
-            (item for item in transfers if item.asset == asset and item.timestamp <= snapshot_time),
-            key=lambda item: (item.timestamp, item.id),
+            (item for item in transfers if item.asset == asset and item.timestamp <= snapshot_time and (window_start is None or item.timestamp >= window_start)),`r`n            key=lambda item: (item.timestamp, item.id),
         )
         incoming = [item for item in relevant if item.destination_address == normalized]
         outgoing = [item for item in relevant if item.source_address == normalized]
@@ -82,6 +83,7 @@ class WalletFeatureExtractor:
             "address": normalized,
             "asset": asset,
             "snapshot_time": snapshot_time,
+            "lookback_hours": lookback_hours,
             "feature_schema_version": FEATURE_SCHEMA_VERSION,
             "features": features,
             "evidence_ids": sorted(evidence_ids),

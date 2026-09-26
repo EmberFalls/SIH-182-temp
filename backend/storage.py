@@ -8,7 +8,7 @@ from typing import Any
 
 from .canonical import canonical_sha256
 from .config import settings
-from .domain import CaseCreateV2, InvestigationCaseV2, InvestigationResultV2, RequestDraftV2, FeatureSnapshotV2, TrainingDatasetV2, ModelVersionV2, ModelInferenceV2, RawEvidenceArtifact, AssertionReviewEventV2
+from .domain import CaseCreateV2, InvestigationCaseV2, InvestigationResultV2, RequestDraftV2, FeatureSnapshotV2, TrainingDatasetV2, ModelVersionV2, ModelInferenceV2, RawEvidenceArtifact, AssertionReviewEventV2, EntityRelationship, EntityRelationshipCreate
 from .domain import (
     AssertionReviewState,
     AssertionType,
@@ -88,6 +88,12 @@ class Store:
                 );
                 CREATE INDEX IF NOT EXISTS assertion_reviews_v2_assertion_idx
                     ON assertion_reviews_v2(assertion_id, created_at DESC);
+                CREATE TABLE IF NOT EXISTS entity_relationships_v2 (
+                    id TEXT PRIMARY KEY, source_entity_id TEXT NOT NULL, target_entity_id TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL,
+                    UNIQUE(source_entity_id, target_entity_id, payload)
+                );
+                CREATE INDEX IF NOT EXISTS entity_relationships_v2_source_idx ON entity_relationships_v2(source_entity_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS entity_relationships_v2_target_idx ON entity_relationships_v2(target_entity_id, created_at DESC);
                 CREATE TABLE IF NOT EXISTS intelligence_sources (
                     id TEXT PRIMARY KEY, payload TEXT NOT NULL, created_at TEXT NOT NULL
                 );
@@ -402,6 +408,33 @@ class Store:
         with self._connection() as connection:
             row = connection.execute("SELECT payload FROM entity_address_assertions WHERE id = ?", (assertion_id,)).fetchone()
         return EntityAddressAssertion.model_validate_json(row["payload"]) if row else None
+    def create_entity_relationship_v2(self, payload: EntityRelationshipCreate) -> EntityRelationship:
+        if not self.get_entity(payload.source_entity_id) or not self.get_entity(payload.target_entity_id):
+            raise ValueError("Entity relationship references an entity that does not exist.")
+        if not self.get_intelligence_source(payload.source_id):
+            raise ValueError("Entity relationship source does not exist.")
+        created_at = _utcnow()
+        evidence_hash = canonical_sha256(payload)
+        relationship = EntityRelationship(
+            id=f"REL-{uuid.uuid4().hex[:12].upper()}", evidence_hash_sha256=evidence_hash,
+            created_at=created_at, **payload.model_dump(),
+        )
+        with self._connection() as connection:
+            rows = connection.execute("SELECT payload FROM entity_relationships_v2 WHERE source_entity_id = ? AND target_entity_id = ?", (relationship.source_entity_id, relationship.target_entity_id)).fetchall()
+            for row in rows:
+                existing = EntityRelationship.model_validate_json(row["payload"])
+                if existing.relationship_type == relationship.relationship_type and existing.source_id == relationship.source_id:
+                    return existing
+            connection.execute("INSERT INTO entity_relationships_v2 VALUES (?, ?, ?, ?, ?)", (relationship.id, relationship.source_entity_id, relationship.target_entity_id, json.dumps(relationship.model_dump(mode="json"), default=_json_default, sort_keys=True), created_at.isoformat()))
+        return relationship
+
+    def list_entity_relationships_v2(self, entity_id: str | None = None) -> list[EntityRelationship]:
+        with self._connection() as connection:
+            if entity_id:
+                rows = connection.execute("SELECT payload FROM entity_relationships_v2 WHERE source_entity_id = ? OR target_entity_id = ? ORDER BY created_at DESC", (entity_id, entity_id)).fetchall()
+            else:
+                rows = connection.execute("SELECT payload FROM entity_relationships_v2 ORDER BY created_at DESC").fetchall()
+        return [EntityRelationship.model_validate_json(row["payload"]) for row in rows]
     def create_intelligence_source(self, payload: IntelligenceSourceCreate) -> IntelligenceSource:
         created_at = _utcnow()
         source = IntelligenceSource(id=f"SOURCE-{uuid.uuid4().hex[:12].upper()}", created_at=created_at, **payload.model_dump())

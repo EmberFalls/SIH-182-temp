@@ -9,13 +9,13 @@ This file records what the prototype can demonstrate today. It is deliberately n
 | Transaction-seeded tracing | Implemented for recorded or synthetic evidence | A transaction-seeded case needs a canonical seed transfer in the evidence package. Live transaction lookup by hash is intentionally blocked until a provider adapter supplies it. |
 | Wallet-context live tracing | Implemented | The dashboard creates a `LIVE` wallet-context trace. Its amount is investigator supplied and the result records the approximate-seed limitation. |
 | Disputed-fund accounting | Implemented | `FundFlowEngineV2` uses a bounded event-driven proportional haircut allocator, lineage, terminals, conservation tests, and explicit historical-balance limitations. |
-| Entity and VASP intelligence | Implemented | Source-backed entities, address assertions, assertion type, review state, freshness, conflict-aware resolver, and auditable human review history are persisted. |
+| Entity and VASP intelligence | Implemented | Source-backed entities, address assertions, reviewed source-backed entity relationships, review state, freshness, conflict-aware resolver, and auditable human review history are persisted. |
 | Deposit inference | Implemented | Explainable receipt-to-sweep rules use only reviewed verified endpoints as targets. Resulting assertions remain unreviewed. |
 | Immutable result and evidence | Implemented | Raw evidence artifacts, transfer hashes, source/assertion references, a versioned result manifest, PDF report, and deterministic trace fingerprint are persisted. |
 | Request routing | Implemented as local draft only | A draft is generated from the same result snapshot and never submitted to SAHYOG or a VASP. Synthetic results cannot create a draft. |
 | Cross-chain continuation | Framework implemented | A reviewed route and exact shared protocol message ID are required. Independent source/destination message extraction remains an external-adapter task. |
-| ML | Conservative baseline implemented | Feature snapshots are time bounded, ML is disabled by default, and output stays `ML_INFERRED`. It is not production validated or allowed to create verified labels. |
-| Dashboard | Implemented for v2 demo and live wallet-context flow | It shows data mode, candidates, allocations, inference reasons, report download, and local-draft result. Recorded package upload remains an API workflow. |
+| ML | Conservative baseline implemented | Feature snapshots support a configured historical lookback, ML is disabled by default, and output stays `ML_INFERRED`. It is not production validated or allowed to create verified labels. |
+| Dashboard | Implemented for v2 demo, live wallet-context flow, and recorded package replay | It shows data mode, candidates, allocations, inference reasons, report download, and local-draft result. Recorded JSON packages can be pasted and replayed with no provider call. |
 | Container deployment | Prototype-ready | Compose serves the frontend and uses a named SQLite volume. PostgreSQL needs a real repository implementation and migrations before deployment. |
 
 ## Operational prerequisites outside this repository

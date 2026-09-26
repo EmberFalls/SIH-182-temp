@@ -29,6 +29,9 @@ from .domain import (
     CaseCreateV2,
     CaseStatusUpdateV2,
     InvestigationTraceRequestV2,
+    RecordedTraceImportV2,
+    EntityRelationship,
+    EntityRelationshipCreate,
     AssertionReviewV2,
     AssertionReviewEventV2,
     RawEvidenceArtifact,
@@ -156,6 +159,18 @@ def create_investigation_case_v2(payload: CaseCreateV2, request: Request) -> Inv
     return case
 
 
+@app.post("/v2/imports/recorded-trace", response_model=InvestigationResultV2, status_code=status.HTTP_201_CREATED)
+async def import_recorded_trace_v2(payload: RecordedTraceImportV2, request: Request) -> InvestigationResultV2:
+    """Create and replay an evidence package without making a provider request."""
+    require_role(request, "investigator", "supervisor", "admin")
+    case = store.create_investigation_case_v2(payload.case, getattr(request.state, "actor", "local-development"))
+    try:
+        result = await InvestigationRunnerV2(store, _v2_explorer_adapter).run(case, payload.trace)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    audit(request, "RECORDED_TRACE_IMPORTED", result.id, {"case_id": case.id, "transfer_count": len(payload.trace.recorded_transfers), "data_mode": result.data_mode.value})
+    return result
+
 @app.get("/v2/cases", response_model=list[InvestigationCaseV2])
 def list_investigation_cases_v2() -> list[InvestigationCaseV2]:
     return store.list_investigation_cases_v2()
@@ -269,7 +284,7 @@ def create_cross_chain_continuation_v2(link_id: str, payload: CrossChainContinua
 @app.post("/v2/ml/feature-snapshots", response_model=FeatureSnapshotV2, status_code=status.HTTP_201_CREATED)
 def create_ml_feature_snapshot(payload: MLFeatureSnapshotRequest, request: Request) -> FeatureSnapshotV2:
     require_role(request, "investigator", "supervisor", "admin")
-    snapshot = WalletFeatureExtractor(EntityResolver(store)).build(payload.address, payload.asset, payload.transfers, payload.snapshot_time)
+    snapshot = WalletFeatureExtractor(EntityResolver(store)).build(payload.address, payload.asset, payload.transfers, payload.snapshot_time, lookback_hours=payload.lookback_hours)
     saved = store.save_feature_snapshot_v2(snapshot)
     audit(request, "ML_FEATURE_SNAPSHOT_CREATED", saved.id, {"feature_schema_version": saved.feature_schema_version, "evidence_count": len(saved.evidence_ids)})
     return saved
@@ -503,6 +518,21 @@ def create_entity(payload: EntityCreate, request: Request) -> Entity:
     audit(request, "ENTITY_CREATED", entity.id, {"entity_type": entity.entity_type.value})
     return entity
 
+
+@app.post("/v2/intelligence/relationships", response_model=EntityRelationship, status_code=status.HTTP_201_CREATED)
+def create_entity_relationship_v2(payload: EntityRelationshipCreate, request: Request) -> EntityRelationship:
+    require_role(request, "label_reviewer", "supervisor", "admin")
+    try:
+        relationship = store.create_entity_relationship_v2(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    audit(request, "ENTITY_RELATIONSHIP_CREATED", relationship.id, {"relationship_type": relationship.relationship_type.value})
+    return relationship
+
+
+@app.get("/v2/intelligence/relationships", response_model=list[EntityRelationship])
+def list_entity_relationships_v2(entity_id: str | None = None) -> list[EntityRelationship]:
+    return store.list_entity_relationships_v2(entity_id)
 
 @app.post("/v2/intelligence/assertions", response_model=EntityAddressAssertion, status_code=status.HTTP_201_CREATED)
 def create_entity_address_assertion(payload: EntityAddressAssertionCreate, request: Request) -> EntityAddressAssertion:

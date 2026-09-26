@@ -233,3 +233,42 @@ def test_v2_assertion_review_keeps_decision_history():
     history = client.get(f"/v2/intelligence/assertions/{assertion['id']}/reviews")
     assert history.status_code == 200
     assert history.json()[0]["rationale"] == "Insufficient independent corroboration."
+
+
+def test_v2_recorded_import_endpoint_creates_case_and_replays_without_provider():
+    asset = {"chain": "ETHEREUM", "symbol": "USDT", "contract_address": "0x" + "a" * 40, "decimals": 6}
+    seed_hash = "0x" + "4" * 64
+    payload = {
+        "case": {"title": "Imported recorded package", "context": {"seed_type": "transaction", "chain": "ETHEREUM", "seed_tx_hash": seed_hash, "asset": asset, "disputed_amount": "15", "incident_time": "2026-09-26T09:00:00Z", "data_mode": "RECORDED_REAL"}},
+        "trace": {"recorded_transfers": [{"id": "IMPORTED-SEED", "transaction_id": "TX-ETHEREUM-" + seed_hash, "chain": "ETHEREUM", "source_address": "0x" + "b" * 40, "destination_address": "0x" + "c" * 40, "asset": asset, "raw_amount": "15", "normalized_amount": "15", "timestamp": "2026-09-26T09:00:00Z", "raw_evidence_id": "EVID-IMPORTED"}]},
+    }
+    response = client.post("/v2/imports/recorded-trace", json=payload)
+    assert response.status_code == 201, response.text
+    result = response.json()
+    assert result["data_mode"] == "RECORDED_REAL"
+    assert client.get(f"/v2/cases/{result['case_id']}").status_code == 200
+    assert client.get("/v2/evidence/EVID-IMPORTED").json()["provider"] == "recorded_import"
+
+
+def test_v2_entity_relationship_requires_source_and_lists_by_entity():
+    source = client.post("/v2/intelligence/sources", json={"name": "Relationship source", "source_type": "INTERNAL_REVIEW", "trust_tier": "A", "retrieved_at": "2026-09-26T09:00:00Z"}).json()
+    cluster = client.post("/v2/intelligence/entities", json={"canonical_name": "Exchange cluster", "entity_type": "VASP"}).json()
+    wallet = client.post("/v2/intelligence/entities", json={"canonical_name": "Exchange wallet group", "entity_type": "SERVICE"}).json()
+    created = client.post("/v2/intelligence/relationships", json={"source_entity_id": wallet["id"], "target_entity_id": cluster["id"], "relationship_type": "CLUSTER_MEMBER_OF", "source_id": source["id"], "review_state": "REVIEWED"})
+    assert created.status_code == 201
+    listed = client.get("/v2/intelligence/relationships", params={"entity_id": cluster["id"]})
+    assert listed.status_code == 200
+    assert listed.json()[0]["relationship_type"] == "CLUSTER_MEMBER_OF"
+
+
+def test_ml_feature_snapshot_honors_optional_lookback_window():
+    asset = {"chain": "ETHEREUM", "symbol": "USDT", "contract_address": "0x" + "d" * 40, "decimals": 6}
+    address = "0x" + "e" * 40
+    payload = {"address": address, "asset": asset, "snapshot_time": "2026-09-26T10:00:00Z", "lookback_hours": 1, "transfers": [
+        {"id": "OLD", "transaction_id": "TX-OLD", "chain": "ETHEREUM", "source_address": "0x" + "f" * 40, "destination_address": address, "asset": asset, "raw_amount": "10", "normalized_amount": "10", "timestamp": "2026-09-26T08:00:00Z", "raw_evidence_id": "EVID-OLD"},
+        {"id": "RECENT", "transaction_id": "TX-RECENT", "chain": "ETHEREUM", "source_address": "0x" + "f" * 40, "destination_address": address, "asset": asset, "raw_amount": "20", "normalized_amount": "20", "timestamp": "2026-09-26T09:30:00Z", "raw_evidence_id": "EVID-RECENT"},
+    ]}
+    response = client.post("/v2/ml/feature-snapshots", json=payload)
+    assert response.status_code == 201
+    assert response.json()["features"]["incoming_tx_count"] == 1.0
+    assert "EVID-OLD" not in response.json()["evidence_ids"]

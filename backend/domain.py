@@ -416,6 +416,47 @@ class InvestigationTraceRequestV2(BaseModel):
     recorded_evidence: list[RawEvidenceArtifact] = Field(default_factory=list)
 
 
+class RecordedTraceImportV2(BaseModel):
+    """A replay package carried entirely by the investigator, with no hidden provider calls."""
+
+    case: CaseCreateV2
+    trace: InvestigationTraceRequestV2
+
+    @model_validator(mode="after")
+    def validate_recorded_mode(self):
+        if self.case.context.data_mode not in {DataMode.RECORDED_REAL, DataMode.SYNTHETIC}:
+            raise ValueError("Recorded import requires a RECORDED_REAL or SYNTHETIC case data mode.")
+        if not self.trace.recorded_transfers:
+            raise ValueError("Recorded import requires at least one canonical transfer.")
+        return self
+
+
+class EntityRelationshipType(str, Enum):
+    CLUSTER_MEMBER_OF = "CLUSTER_MEMBER_OF"
+    OPERATED_BY = "OPERATED_BY"
+    RELATED_SERVICE = "RELATED_SERVICE"
+
+
+class EntityRelationshipCreate(BaseModel):
+    source_entity_id: str
+    target_entity_id: str
+    relationship_type: EntityRelationshipType
+    source_id: str
+    review_state: AssertionReviewState = AssertionReviewState.UNREVIEWED
+    notes: str | None = Field(default=None, max_length=3_000)
+
+    @model_validator(mode="after")
+    def validate_distinct_entities(self):
+        if self.source_entity_id == self.target_entity_id:
+            raise ValueError("Entity relationships must connect two distinct entities.")
+        return self
+
+
+class EntityRelationship(EntityRelationshipCreate):
+    id: str
+    evidence_hash_sha256: str
+    created_at: datetime
+
 class AssertionReviewV2(BaseModel):
     review_state: Literal["REVIEWED", "REJECTED"]
     rationale: str = Field(min_length=3, max_length=3_000)
@@ -639,6 +680,7 @@ class MLFeatureSnapshotRequest(BaseModel):
     address: str = Field(min_length=20, max_length=100)
     asset: AssetRef
     snapshot_time: datetime
+    lookback_hours: int | None = Field(default=None, ge=1, le=24 * 365)
     transfers: list[CanonicalTransfer]
 
 

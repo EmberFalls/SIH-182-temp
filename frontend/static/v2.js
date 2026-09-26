@@ -84,6 +84,26 @@
     }
   }
 
+  async function importRecordedPackage(event) {
+    event.preventDefault();
+    const form = event.target;
+    const submit = q("#recordedImportForm button[value='default']");
+    submit.disabled = true;
+    try {
+      const values = Object.fromEntries(new FormData(form));
+      const payload = JSON.parse(values.package_json);
+      const result = await request("/v2/imports/recorded-trace", { body: JSON.stringify(payload) });
+      const caseRecord = await request(`/v2/cases/${result.case_id}`, { method: "GET" });
+      q("#recordedImportDialog").close();
+      form.reset();
+      render({ ...result, case: caseRecord });
+    } catch (error) {
+      const notice = q("#notice");
+      if (notice) { notice.hidden = false; notice.className = "notice error"; notice.textContent = `Recorded package was not imported: ${error.message}`; }
+    } finally {
+      submit.disabled = false;
+    }
+  }
   async function createLiveCase(event) {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(event.target));
@@ -133,6 +153,8 @@
     q("#emptyState").hidden = false;
   }
 
+  q("#importRecordedButton")?.addEventListener("click", () => q("#recordedImportDialog").showModal());
+  q("#recordedImportForm")?.addEventListener("submit", importRecordedPackage);
   q("#v2DemoButton")?.addEventListener("click", load);
   q("#newV2CaseButton")?.addEventListener("click", () => q("#v2CaseDialog").showModal());
   q("#v2CaseForm")?.addEventListener("submit", createLiveCase);
