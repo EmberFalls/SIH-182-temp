@@ -442,6 +442,9 @@ class RecordedTraceCsvImportV2(BaseModel):
             raise ValueError("CSV replay requires a RECORDED_REAL or SYNTHETIC case data mode.")
         return self
 
+class EntityAssertionCsvImportV2(BaseModel):
+    csv_text: str = Field(min_length=50, max_length=5_000_000)
+
 class EntityRelationshipType(str, Enum):
     CLUSTER_MEMBER_OF = "CLUSTER_MEMBER_OF"
     OPERATED_BY = "OPERATED_BY"

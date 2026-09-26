@@ -13,6 +13,7 @@ from .capabilities import ChainCapabilityV2, capability_matrix
 from .adapters import LegacyExplorerAdapter
 from .investigation_v2 import InvestigationRunnerV2
 from .imports_v2 import parse_recorded_transfers_csv
+from .intelligence_imports import import_entity_assertions_csv
 from .demo import DemoScenarioService
 from .entity_resolution import EntityResolver
 from .cross_chain_v2 import (
@@ -34,6 +35,7 @@ from .domain import (
     RecordedTraceCsvImportV2,
     EntityRelationship,
     EntityRelationshipCreate,
+    EntityAssertionCsvImportV2,
     AssertionReviewV2,
     AssertionReviewEventV2,
     RawEvidenceArtifact,
@@ -68,6 +70,7 @@ from .ml_v2 import (
     register_trained_role_model,
 )
 from .jobs import TraceJobs
+from .jobs_v2 import PersistentTraceJobsV2
 from .models import CaseCreate, CaseNote, CaseNoteCreate, CaseSummary, CaseUpdate, ChallengeRequest, ChallengeResult, LabelImportResult, LabelReview, LabelReviewEvent, SahyogDraft, TraceRequest, TraceResult, VaspCandidate, VaspLabel, VaspLabelCreate
 from .reports import InvestigationReport
 from .reports_v2 import InvestigationResultReportV2
@@ -82,6 +85,7 @@ from .tron import ProviderUnavailable
 store = Store()
 trace_service = TraceService(store)
 trace_jobs = TraceJobs()
+v2_trace_jobs = PersistentTraceJobsV2(store)
 report_renderer = InvestigationReport()
 v2_report_renderer = InvestigationResultReportV2()
 v2_request_exporter = GenericSahyogDraftExporter()
@@ -233,6 +237,24 @@ async def trace_investigation_case_v2(case_id: str, payload: InvestigationTraceR
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     audit(request, "V2_TRACE_COMPLETED", result.id, {"case_id": case_id, "version": result.version, "data_mode": result.data_mode.value, "manifest_sha256": result.evidence_manifest.sha256})
     return result
+
+@app.post("/v2/cases/{case_id}/trace-jobs", status_code=status.HTTP_202_ACCEPTED)
+async def start_v2_trace_job(case_id: str, payload: InvestigationTraceRequestV2, request: Request) -> dict:
+    require_role(request, "investigator", "supervisor", "admin")
+    case = store.get_investigation_case_v2(case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="V2 investigation case not found")
+    job = PersistentTraceJobsV2(store).submit(lambda: InvestigationRunnerV2(store, _v2_explorer_adapter).run(case, payload))
+    audit(request, "V2_TRACE_JOB_CREATED", job["job_id"], {"case_id": case_id})
+    return job
+
+
+@app.get("/v2/trace-jobs/{job_id}")
+def get_v2_trace_job(job_id: str) -> dict:
+    job = store.get_v2_trace_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="V2 trace job not found")
+    return job
 
 @app.get("/v2/cases/{case_id}/results", response_model=list[InvestigationResultV2])
 def list_investigation_results_v2(case_id: str) -> list[InvestigationResultV2]:
@@ -533,6 +555,16 @@ def create_entity(payload: EntityCreate, request: Request) -> Entity:
     audit(request, "ENTITY_CREATED", entity.id, {"entity_type": entity.entity_type.value})
     return entity
 
+
+@app.post("/v2/intelligence/import/assertions/csv")
+def import_entity_assertions_csv_v2(payload: EntityAssertionCsvImportV2, request: Request) -> dict:
+    require_role(request, "label_reviewer", "supervisor", "admin")
+    try:
+        outcome = import_entity_assertions_csv(store, payload.csv_text)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    audit(request, "ENTITY_ASSERTIONS_CSV_IMPORTED", "entity_address_assertions", {"imported": outcome["imported"], "rejected": len(outcome["rejected"])})
+    return outcome
 
 @app.post("/v2/intelligence/relationships", response_model=EntityRelationship, status_code=status.HTTP_201_CREATED)
 def create_entity_relationship_v2(payload: EntityRelationshipCreate, request: Request) -> EntityRelationship:

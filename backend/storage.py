@@ -94,6 +94,10 @@ class Store:
                 );
                 CREATE INDEX IF NOT EXISTS entity_relationships_v2_source_idx ON entity_relationships_v2(source_entity_id, created_at DESC);
                 CREATE INDEX IF NOT EXISTS entity_relationships_v2_target_idx ON entity_relationships_v2(target_entity_id, created_at DESC);
+                CREATE TABLE IF NOT EXISTS v2_trace_jobs (
+                    id TEXT PRIMARY KEY, payload TEXT NOT NULL, created_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS v2_trace_jobs_created_idx ON v2_trace_jobs(created_at DESC);
                 CREATE TABLE IF NOT EXISTS intelligence_sources (
                     id TEXT PRIMARY KEY, payload TEXT NOT NULL, created_at TEXT NOT NULL
                 );
@@ -435,6 +439,22 @@ class Store:
             else:
                 rows = connection.execute("SELECT payload FROM entity_relationships_v2 ORDER BY created_at DESC").fetchall()
         return [EntityRelationship.model_validate_json(row["payload"]) for row in rows]
+    def save_v2_trace_job(self, job: dict) -> dict:
+        with self._connection() as connection:
+            connection.execute("INSERT OR REPLACE INTO v2_trace_jobs VALUES (?, ?, ?)", (job["job_id"], json.dumps(job, default=_json_default, sort_keys=True), job["created_at"]))
+        return job
+
+    def get_v2_trace_job(self, job_id: str) -> dict | None:
+        with self._connection() as connection:
+            row = connection.execute("SELECT payload FROM v2_trace_jobs WHERE id = ?", (job_id,)).fetchone()
+        return json.loads(row["payload"]) if row else None
+
+    def update_v2_trace_job(self, job_id: str, changes: dict) -> dict | None:
+        job = self.get_v2_trace_job(job_id)
+        if not job:
+            return None
+        job.update(changes)
+        return self.save_v2_trace_job(job)
     def create_intelligence_source(self, payload: IntelligenceSourceCreate) -> IntelligenceSource:
         created_at = _utcnow()
         source = IntelligenceSource(id=f"SOURCE-{uuid.uuid4().hex[:12].upper()}", created_at=created_at, **payload.model_dump())
