@@ -60,6 +60,12 @@ class ProviderSnapshotRepository:
         known = {item.id for item in self._transfers}
         self._transfers.extend(item for item in result.transfers if item.id not in known and self._matches_asset(item, asset))
 
+    async def load_transaction(self, transaction_hash: str, asset: AssetRef) -> None:
+        result = await self.adapter_factory(asset.chain).transaction_transfers(transaction_hash, asset)
+        self.store.save_raw_evidence_artifact_v2(result.evidence)
+        self.warnings.extend(result.warnings)
+        known = {item.id for item in self._transfers}
+        self._transfers.extend(item for item in result.transfers if item.id not in known and self._matches_asset(item, asset))
     async def outgoing_transfers(self, address: str, asset: AssetRef, start_time: datetime, end_time: datetime | None) -> list[CanonicalTransfer]:
         await self.load(address, asset)
         normalized = address.lower() if address.startswith("0x") else address
@@ -88,6 +94,12 @@ class RecordedSnapshotRepository:
     def transfers(self) -> list[CanonicalTransfer]:
         return self._transfers
 
+    async def load_transaction(self, transaction_hash: str, asset: AssetRef) -> None:
+        result = await self.adapter_factory(asset.chain).transaction_transfers(transaction_hash, asset)
+        self.store.save_raw_evidence_artifact_v2(result.evidence)
+        self.warnings.extend(result.warnings)
+        known = {item.id for item in self._transfers}
+        self._transfers.extend(item for item in result.transfers if item.id not in known and self._matches_asset(item, asset))
     async def outgoing_transfers(self, address: str, asset: AssetRef, start_time: datetime, end_time: datetime | None) -> list[CanonicalTransfer]:
         normalized = address.lower() if address.startswith("0x") else address
         return [
@@ -96,6 +108,34 @@ class RecordedSnapshotRepository:
             and ProviderSnapshotRepository._matches_asset(item, asset)
         ]
 
+
+class ObservedLedgerBalances:
+    """Reconstructs the balance visible in the retained evidence strictly before an arrival.
+
+    It never represents a provider-wide historical balance. Unknown activity remains
+    outside the observed ledger and is reported as PARTIAL quality.
+    """
+
+    def __init__(self, repository) -> None:
+        self.repository = repository
+
+    async def state_at(self, address: str, asset: AssetRef, timestamp: datetime) -> WalletAssetStateSnapshot:
+        normalized = address.lower() if address.startswith("0x") else address
+        prior = [
+            item for item in self.repository.transfers
+            if item.timestamp < timestamp and ProviderSnapshotRepository._matches_asset(item, asset)
+            and (item.source_address == normalized or item.destination_address == normalized)
+        ]
+        if not prior:
+            return WalletAssetStateSnapshot(address=address, asset=asset, historical_balance_quality=HistoricalBalanceQuality.UNKNOWN)
+        incoming = sum((item.normalized_amount for item in prior if item.destination_address == normalized), Decimal("0"))
+        outgoing = sum((item.normalized_amount for item in prior if item.source_address == normalized), Decimal("0"))
+        return WalletAssetStateSnapshot(
+            address=address,
+            asset=asset,
+            clean_balance=max(Decimal("0"), incoming - outgoing),
+            historical_balance_quality=HistoricalBalanceQuality.PARTIAL,
+        )
 
 class UnknownHistoricalBalances:
     async def state_at(self, address: str, asset: AssetRef, timestamp: datetime) -> WalletAssetStateSnapshot:
@@ -121,7 +161,7 @@ class InvestigationRunnerV2:
         resolver = EntityResolver(self.store)
         engine = FundFlowEngineV2(
             repository,
-            UnknownHistoricalBalances(),
+            ObservedLedgerBalances(repository),
             terminal_classifier=lambda transfer: self._terminal_reason(resolver, transfer),
         )
         flow = await engine.trace(seed, policy)
@@ -170,7 +210,9 @@ class InvestigationRunnerV2:
                 seed_type=SeedType.WALLET_CONTEXT,
             )
         if context.data_mode == DataMode.LIVE:
-            raise ValueError("Live transaction-seeded tracing is unavailable until a transaction-by-hash provider adapter is configured. Use a wallet-context case or import recorded transaction evidence.")
+            if not isinstance(repository, ProviderSnapshotRepository):
+                raise ValueError("Live transaction seed requires a live provider snapshot repository.")
+            await repository.load_transaction(context.seed_tx_hash or "", context.asset)
         transfer = self._find_seed_transfer(context, request, repository.transfers)
         return FlowSeed(
             id=f"SEED-{case.id}", address=transfer.destination_address, asset=transfer.asset,
@@ -234,7 +276,7 @@ class InvestigationRunnerV2:
             limitations.append("RECORDED_REAL output is limited to the supplied evidence package and its stated collection scope.")
         if case.context.data_mode == DataMode.SYNTHETIC:
             limitations.append("SYNTHETIC output is a demonstration artifact and cannot be used for operational routing.")
-        limitations.append("Historical wallet balances are not reconstructed in this prototype; proportional allocations identify an evidence-bounded disputed-fund path, not ownership.")
+        limitations.append("Historical balances are reconstructed only from retained transfers before each event; unobserved activity remains outside this partial ledger, so flow allocation is evidence-bounded and does not establish ownership.")
         if not transfers:
             limitations.append("No matching transfers were available in the evidence snapshot.")
         if seed.seed_type == SeedType.WALLET_CONTEXT:

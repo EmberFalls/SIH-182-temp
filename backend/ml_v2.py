@@ -72,7 +72,8 @@ class WalletFeatureExtractor:
         normalized = normalize_address(asset.chain, address)
         window_start = snapshot_time - timedelta(hours=lookback_hours) if lookback_hours else None
         relevant = sorted(
-            (item for item in transfers if item.asset == asset and item.timestamp <= snapshot_time and (window_start is None or item.timestamp >= window_start)),`r`n            key=lambda item: (item.timestamp, item.id),
+            (item for item in transfers if item.asset == asset and item.timestamp <= snapshot_time and (window_start is None or item.timestamp >= window_start)),
+            key=lambda item: (item.timestamp, item.id),
         )
         incoming = [item for item in relevant if item.destination_address == normalized]
         outgoing = [item for item in relevant if item.source_address == normalized]

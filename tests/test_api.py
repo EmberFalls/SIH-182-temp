@@ -272,3 +272,22 @@ def test_ml_feature_snapshot_honors_optional_lookback_window():
     assert response.status_code == 201
     assert response.json()["features"]["incoming_tx_count"] == 1.0
     assert "EVID-OLD" not in response.json()["evidence_ids"]
+
+
+def test_tron_transaction_seed_adapter_normalizes_confirmed_transfer():
+    import asyncio
+    from datetime import datetime, timezone
+    from decimal import Decimal
+    from backend.adapters import LegacyExplorerAdapter
+    from backend.domain import AssetRef
+    from backend.models import Chain, TransferEvidence
+
+    class FakeTronClient:
+        async def transaction_trc20_transfers(self, tx_hash, symbol, contract, decimals):
+            return [TransferEvidence(transaction_hash=tx_hash, source_address="T" + "A" * 33, destination_address="T" + "B" * 33, token_symbol=symbol, token_contract=contract or "TR7", amount=Decimal("12.5"), timestamp=datetime(2026, 9, 26, tzinfo=timezone.utc), block_number=123, confirmed=True, provider="TronGrid", retrieved_at=datetime(2026, 9, 26, tzinfo=timezone.utc))], {"provider": "TronGrid", "endpoint": "https://api.trongrid.io/v1/transactions/test/events", "retrieved_at": "2026-09-26T00:00:00Z"}
+
+    asset = AssetRef(chain=Chain.TRON, symbol="USDT", contract_address="TR7", decimals=6)
+    result = asyncio.run(LegacyExplorerAdapter(Chain.TRON, FakeTronClient()).transaction_transfers("a" * 64, asset))
+    assert result.complete is True
+    assert result.transfers[0].source_address.startswith("T")
+    assert result.transfers[0].transaction_id.endswith("a" * 64)

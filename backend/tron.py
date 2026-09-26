@@ -73,6 +73,42 @@ class TronGridClient:
         self._cache[cache_key] = (monotonic(), transfers, provenance)
         return transfers, provenance
 
+    async def transaction_trc20_transfers(self, transaction_hash: str, token_symbol: str, token_contract: str | None, decimals: int) -> tuple[list[TransferEvidence], dict]:
+        """Read confirmed TRC-20 Transfer events for one transaction only."""
+        if not self.configured:
+            raise ProviderUnavailable("TRONGRID_API_KEY is required for live TRON transaction-seeded tracing.")
+        retrieved_at = datetime.now(timezone.utc)
+        url = f"{self.base_url}/v1/transactions/{transaction_hash}/events"
+        headers = {"TRON-PRO-API-KEY": self.api_key}
+        async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
+            body, attempts = await self._get_page(client, url, headers, {"only_confirmed": "true"})
+        records = body.get("data", []) if isinstance(body.get("data"), list) else []
+        transfers: list[TransferEvidence] = []
+        for event in records:
+            if event.get("event_name") != "Transfer":
+                continue
+            contract = str(event.get("contract_address") or "")
+            if token_contract and contract != token_contract:
+                continue
+            result = event.get("result") or {}
+            source = result.get("from") or result.get("0")
+            destination = result.get("to") or result.get("1")
+            raw_value = result.get("value") or result.get("2")
+            if not source or not destination or raw_value is None:
+                continue
+            try:
+                amount = Decimal(str(raw_value)) / (Decimal(10) ** decimals)
+            except Exception:
+                continue
+            transfers.append(TransferEvidence(
+                transaction_hash=transaction_hash, source_address=str(source), destination_address=str(destination),
+                token_symbol=token_symbol.upper(), token_contract=contract, amount=amount,
+                timestamp=datetime.fromtimestamp(int(event.get("block_timestamp", 0)) / 1000, tz=timezone.utc),
+                block_number=int(event["block_number"]) if event.get("block_number") is not None else None,
+                confirmed=True, provider=self.provider_name, retrieved_at=retrieved_at,
+            ))
+        provenance = {"provider": self.provider_name, "endpoint": url, "parameters": {"only_confirmed": "true"}, "retrieved_at": retrieved_at.isoformat(), "accepted_records": len(transfers), "provider_attempts": attempts, "transaction_hash": transaction_hash}
+        return transfers, provenance
     async def _get_page(self, client: httpx.AsyncClient, url: str, headers: dict, params: dict) -> tuple[dict, int]:
         last_problem = "connection failure"
         for attempt in range(1, settings.provider_retry_attempts + 1):

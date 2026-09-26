@@ -6,9 +6,9 @@ This file records what the prototype can demonstrate today. It is deliberately n
 | --- | --- | --- |
 | Canonical case, asset, transfer, data mode | Implemented | V2 contracts retain `LIVE`, `RECORDED_REAL`, and `SYNTHETIC`, canonical transfer IDs, Decimal amounts, and a saved trace policy. |
 | Provider normalization | Implemented for TRON, Ethereum, BNB Chain, and Polygon outbound token retrieval | The v2 runner uses the existing read-only explorer adapters. Bitcoin and Solana remain declared unavailable. |
-| Transaction-seeded tracing | Implemented for recorded or synthetic evidence | A transaction-seeded case needs a canonical seed transfer in the evidence package. Live transaction lookup by hash is intentionally blocked until a provider adapter supplies it. |
+| Transaction-seeded tracing | Implemented for recorded or synthetic evidence and live TRON TRC-20 events | A transaction-seeded case needs a canonical seed transfer in the evidence package. Live TRON uses confirmed transaction event retrieval; EVM transaction event retrieval remains blocked until its provider adapter is added. |
 | Wallet-context live tracing | Implemented | The dashboard creates a `LIVE` wallet-context trace. Its amount is investigator supplied and the result records the approximate-seed limitation. |
-| Disputed-fund accounting | Implemented | `FundFlowEngineV2` uses a bounded event-driven proportional haircut allocator, lineage, terminals, conservation tests, and explicit historical-balance limitations. |
+| Disputed-fund accounting | Implemented | `FundFlowEngineV2` uses a bounded event-driven proportional haircut allocator, lineage, terminals, conservation tests, and an observed-ledger reconstruction from retained pre-event transfers. It remains partial when the evidence snapshot is incomplete. |
 | Entity and VASP intelligence | Implemented | Source-backed entities, address assertions, reviewed source-backed entity relationships, review state, freshness, conflict-aware resolver, and auditable human review history are persisted. |
 | Deposit inference | Implemented | Explainable receipt-to-sweep rules use only reviewed verified endpoints as targets. Resulting assertions remain unreviewed. |
 | Immutable result and evidence | Implemented | Raw evidence artifacts, transfer hashes, source/assertion references, a versioned result manifest, PDF report, and deterministic trace fingerprint are persisted. |
@@ -29,5 +29,5 @@ This file records what the prototype can demonstrate today. It is deliberately n
 ## Demonstration paths
 
 - **Live:** Dashboard → **New v2 live trace** → wallet context. It uses configured read-only explorer credentials and retains provider limitations.
-- **Recorded real:** `POST /v2/cases/{case_id}/trace` with canonical `recorded_transfers` and optional `recorded_evidence`. It produces a replayable immutable snapshot without a network request.
+- **Recorded real:** Use the dashboard **Import recorded package** control or `POST /v2/imports/recorded-trace` with canonical `recorded_transfers` and optional `recorded_evidence`. It produces a replayable immutable snapshot without a network request.
 - **Synthetic:** **Load v2 evidence demo**. Every output is marked synthetic and routing remains disabled.

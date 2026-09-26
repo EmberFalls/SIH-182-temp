@@ -8,6 +8,7 @@ from typing import Protocol
 from .canonical import canonical_sha256
 from .domain import AssetRef, CanonicalTransaction, CanonicalTransfer, ProviderAdapterResult, RawEvidenceArtifact, normalize_address
 from .models import Chain, TransferEvidence
+from .tron import ProviderUnavailable
 
 
 class TransferProviderAdapter(Protocol):
@@ -32,6 +33,13 @@ class LegacyExplorerAdapter:
         warnings = ["PARTIAL_PROVIDER_DATA"] if not complete else []
         return ProviderAdapterResult(provider=str(provenance.get("provider", "unknown")), chain=self.chain, transfers=canonical, evidence=evidence, complete=complete, warnings=warnings)
 
+    async def transaction_transfers(self, transaction_hash: str, asset: AssetRef) -> ProviderAdapterResult:
+        if self.chain != Chain.TRON or not hasattr(self.client, "transaction_trc20_transfers"):
+            raise ProviderUnavailable(f"{self.chain.value} does not yet provide token Transfer events by transaction hash.")
+        transfers, provenance = await self.client.transaction_trc20_transfers(transaction_hash, asset.symbol, asset.contract_address, asset.decimals)
+        evidence = self._evidence(provenance)
+        canonical = [self._transfer(item, evidence.id, index) for index, item in enumerate(transfers)]
+        return ProviderAdapterResult(provider=str(provenance.get("provider", "unknown")), chain=self.chain, transfers=canonical, evidence=evidence, complete=True, warnings=[])
     def _evidence(self, provenance: dict) -> RawEvidenceArtifact:
         safe_provenance = self._redact_secrets(provenance)
         fingerprint = canonical_sha256({"chain": self.chain.value, "provenance": safe_provenance})
