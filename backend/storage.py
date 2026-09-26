@@ -25,6 +25,7 @@ from .domain import (
     ResolvedEntityAssertion,
     TrustTier,
 )
+from .bridge_events import BridgeEventV2
 from .cross_chain_v2 import BridgeRouteV2, CrossChainLinkV2
 from .models import CaseCreate, CaseNote, CaseSummary, CaseUpdate, LabelReview, LabelReviewEvent, VaspLabel, VaspLabelCreate
 
@@ -156,7 +157,12 @@ class Store:
                 );
                 CREATE INDEX IF NOT EXISTS bridge_routes_v2_pair_idx
                     ON bridge_routes_v2(source_chain, destination_chain, created_at DESC);
-                CREATE TABLE IF NOT EXISTS cross_chain_links_v2 (
+                CREATE TABLE IF NOT EXISTS bridge_events_v2 (
+                    id TEXT PRIMARY KEY, protocol TEXT NOT NULL, direction TEXT NOT NULL, message_id TEXT NOT NULL,
+                    raw_evidence_id TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS bridge_events_v2_message_idx
+                    ON bridge_events_v2(protocol, message_id, created_at DESC);                CREATE TABLE IF NOT EXISTS cross_chain_links_v2 (
                     id TEXT PRIMARY KEY, route_id TEXT NOT NULL, status TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS cross_chain_links_v2_route_idx
@@ -314,6 +320,39 @@ class Store:
             rows = connection.execute("SELECT payload FROM bridge_routes_v2 ORDER BY created_at DESC").fetchall()
         return [BridgeRouteV2.model_validate_json(row["payload"]) for row in rows]
 
+    def save_bridge_event_v2(self, event: BridgeEventV2) -> BridgeEventV2:
+        with self._connection() as connection:
+            existing = connection.execute("SELECT payload FROM bridge_events_v2 WHERE id = ?", (event.id,)).fetchone()
+            if existing:
+                return BridgeEventV2.model_validate_json(existing["payload"])
+            connection.execute(
+                "INSERT INTO bridge_events_v2 VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (event.id, event.protocol, event.direction.value, event.message_id, event.raw_evidence_id,
+                 json.dumps(event.model_dump(mode="json"), default=_json_default, sort_keys=True), event.extracted_at.isoformat()),
+            )
+        return event
+
+    def get_bridge_event_v2(self, event_id: str) -> BridgeEventV2 | None:
+        with self._connection() as connection:
+            row = connection.execute("SELECT payload FROM bridge_events_v2 WHERE id = ?", (event_id,)).fetchone()
+        return BridgeEventV2.model_validate_json(row["payload"]) if row else None
+
+    def list_bridge_events_v2(self, protocol: str | None = None, message_id: str | None = None) -> list[BridgeEventV2]:
+        query = "SELECT payload FROM bridge_events_v2"
+        values: list[str] = []
+        filters: list[str] = []
+        if protocol:
+            filters.append("protocol = ?")
+            values.append(protocol)
+        if message_id:
+            filters.append("message_id = ?")
+            values.append(message_id)
+        if filters:
+            query += " WHERE " + " AND ".join(filters)
+        query += " ORDER BY created_at DESC"
+        with self._connection() as connection:
+            rows = connection.execute(query, values).fetchall()
+        return [BridgeEventV2.model_validate_json(row["payload"]) for row in rows]
     def save_cross_chain_link_v2(self, link: CrossChainLinkV2) -> CrossChainLinkV2:
         with self._connection() as connection:
             existing = connection.execute("SELECT payload FROM cross_chain_links_v2 WHERE id = ?", (link.id,)).fetchone()

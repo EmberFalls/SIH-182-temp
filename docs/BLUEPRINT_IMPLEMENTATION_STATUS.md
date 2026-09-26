@@ -13,10 +13,10 @@ This file records what the prototype can demonstrate today. It is deliberately n
 | Deposit inference | Implemented | Explainable receipt-to-sweep rules use only reviewed verified endpoints as targets. Resulting assertions remain unreviewed. |
 | Immutable result and evidence | Implemented | Raw evidence artifacts, transfer hashes, source/assertion references, a versioned result manifest, PDF report, and deterministic trace fingerprint are persisted. |
 | Request routing | Implemented as local draft only | A draft is generated from the same result snapshot and never submitted to SAHYOG or a VASP. Synthetic results cannot create a draft. |
-| Cross-chain continuation | Framework implemented | A reviewed route and exact shared protocol message ID are required. Independent source/destination message extraction remains an external-adapter task. |
+| Cross-chain continuation | Evidence workflow implemented | A reviewed route and exact shared protocol message ID are required. Normalized source/destination events can be extracted from retained raw-evidence artifacts and resolved only when their exact IDs match. A protocol-specific collector still has to decode and retain those raw events. |
 | ML | Conservative baseline implemented | Feature snapshots support a configured historical lookback, ML is disabled by default, and output stays `ML_INFERRED`. It is not production validated or allowed to create verified labels. |
-| Dashboard | Implemented for v2 demo, live wallet-context flow, and recorded package replay | It shows data mode, candidates, allocations, inference reasons, report download, and local-draft result. Recorded JSON packages can be pasted and replayed with no provider call. |
-| Container deployment | Prototype-ready | Compose serves the frontend and uses a named SQLite volume. PostgreSQL needs a real repository implementation and migrations before deployment. |
+| Dashboard | Implemented for v2 demo, live wallet-context flow, and recorded evidence replay | It shows data mode, candidates, allocations, inference reasons, report download, and local-draft result. Recorded JSON packages, transfer CSV files pasted as text, and source-backed intelligence assertion CSV data can be imported without a provider call. |
+| Container deployment | Prototype-ready with PostgreSQL migration boundary | Compose serves the frontend and uses a named SQLite volume. A PostgreSQL 16+ v2 migration and repository contract are included; the runtime adapter and managed database remain deployment work. |
 
 ## Operational prerequisites outside this repository
 
@@ -24,7 +24,7 @@ This file records what the prototype can demonstrate today. It is deliberately n
 2. A transaction-by-hash collector plus historical balance source for live transaction-seeded analysis.
 3. Licensed, reviewed entity labels with provenance, expiry, and reviewer workflow.
 4. Reviewed ground truth, holdout validation, monitoring, and approval before enabling ML in an operational environment.
-5. Durable jobs, a multi-user database repository, secrets management, retention controls, and deployment review.
+5. A durable worker runtime, a tested multi-user PostgreSQL repository adapter, secrets management, retention controls, and deployment review.
 
 ## Demonstration paths
 

@@ -27,6 +27,12 @@ from .cross_chain_v2 import (
     new_bridge_route,
 )
 from .v2_demo import V2DemoScenarioService
+from .bridge_events import (
+    BridgeEventExtractionRequestV2,
+    BridgeEventResolveRequestV2,
+    BridgeEventV2,
+    NormalizedBridgeEventExtractorV2,
+)
 from .domain import (
     CaseCreateV2,
     CaseStatusUpdateV2,
@@ -278,6 +284,70 @@ def create_bridge_route_v2(payload: BridgeRouteCreateV2, request: Request) -> Br
 def list_bridge_routes_v2() -> list[BridgeRouteV2]:
     return store.list_bridge_routes_v2()
 
+
+@app.post("/v2/bridges/events/extract", response_model=BridgeEventV2, status_code=status.HTTP_201_CREATED)
+def extract_bridge_event_v2(payload: BridgeEventExtractionRequestV2, request: Request) -> BridgeEventV2:
+    """Persist an exact bridge-message event decoded by an evidence collector."""
+    require_role(request, "investigator", "supervisor", "admin")
+    artifact = store.get_raw_evidence_artifact_v2(payload.raw_evidence_id)
+    if not artifact:
+        raise HTTPException(status_code=404, detail="Raw evidence artifact not found")
+    try:
+        event = NormalizedBridgeEventExtractorV2().extract(artifact, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    saved = store.save_bridge_event_v2(event)
+    audit(request, "BRIDGE_EVENT_EXTRACTED", saved.id, {
+        "protocol": saved.protocol, "direction": saved.direction.value,
+        "raw_evidence_id": saved.raw_evidence_id,
+    })
+    return saved
+
+
+@app.get("/v2/bridges/events", response_model=list[BridgeEventV2])
+def list_bridge_events_v2(protocol: str | None = None, message_id: str | None = None) -> list[BridgeEventV2]:
+    return store.list_bridge_events_v2(protocol=protocol, message_id=message_id)
+
+
+@app.get("/v2/bridges/events/{event_id}", response_model=BridgeEventV2)
+def get_bridge_event_v2(event_id: str) -> BridgeEventV2:
+    event = store.get_bridge_event_v2(event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="Bridge event not found")
+    return event
+
+
+@app.post("/v2/cross-chain/links/resolve-events", response_model=CrossChainLinkV2, status_code=status.HTTP_201_CREATED)
+def resolve_cross_chain_events_v2(payload: BridgeEventResolveRequestV2, request: Request) -> CrossChainLinkV2:
+    """Resolve persisted source and destination protocol events with one exact message ID."""
+    require_role(request, "investigator", "supervisor", "admin")
+    source = store.get_bridge_event_v2(payload.source_event_id)
+    destination = store.get_bridge_event_v2(payload.destination_event_id)
+    if not source or not destination:
+        raise HTTPException(status_code=404, detail="Source or destination bridge event not found")
+    if source.direction.value != "SOURCE" or destination.direction.value != "DESTINATION":
+        raise HTTPException(status_code=422, detail="Events must be SOURCE then DESTINATION.")
+    if source.protocol.casefold() != destination.protocol.casefold():
+        raise HTTPException(status_code=422, detail="Bridge event protocols do not match.")
+    if source.message_id != destination.message_id:
+        raise HTTPException(status_code=422, detail="Bridge event message identifiers do not match.")
+    try:
+        link = CrossChainResolverV2(store).resolve(CrossChainResolveRequestV2(
+            route_id=payload.route_id,
+            source_transfer=source.transfer,
+            destination_transfer=destination.transfer,
+            message_id=source.message_id,
+            source_event_evidence_id=source.raw_evidence_id,
+            destination_event_evidence_id=destination.raw_evidence_id,
+        ), datetime.now(timezone.utc))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    saved = store.save_cross_chain_link_v2(link)
+    audit(request, "CROSS_CHAIN_EVENTS_VERIFIED", saved.id, {
+        "route_id": saved.route_id, "source_event_id": source.id,
+        "destination_event_id": destination.id, "message_id": saved.message_id,
+    })
+    return saved
 
 @app.post("/v2/cross-chain/links/resolve", response_model=CrossChainLinkV2, status_code=status.HTTP_201_CREATED)
 def resolve_cross_chain_link_v2(payload: CrossChainResolveRequestV2, request: Request) -> CrossChainLinkV2:

@@ -23,7 +23,10 @@ The resolver never infers a cross-chain continuation from matching amounts, timi
 
 - POST /v2/bridges/routes registers a reviewed route.
 - GET /v2/bridges/routes lists route records.
-- POST /v2/cross-chain/links/resolve persists a verified, evidence-bound source/destination link.
+- POST /v2/bridges/events/extract reads a retained normalized `bridge_event` envelope and persists an exact source or destination event.
+- GET /v2/bridges/events and GET /v2/bridges/events/{id} retrieve retained bridge event evidence.
+- POST /v2/cross-chain/links/resolve-events resolves a persisted source and destination event only when the protocol and exact message identifier agree.
+- POST /v2/cross-chain/links/resolve persists a verified, evidence-bound source/destination link when an adapter has already supplied the event values.
 - GET /v2/cross-chain/links and GET /v2/cross-chain/links/{id} retrieve link evidence.
 - POST /v2/cross-chain/links/{id}/continuations produces a destination FlowSeed.
 
@@ -46,3 +49,22 @@ fixtures/recorded_real/wormhole_avalanche_fuji_to_base_sepolia_message.json reco
 tests/test_cross_chain_v2.py is a fully reproducible SYNTHETIC exact-message pair. It tests the complete source-event → verified link → scaled destination seed → destination trace path. It is never presented as real blockchain intelligence.
 
 Before operational use, replace the source-only recorded fixture with adapter-captured source and destination events plus their verified message identifier.
+## Normalized evidence envelope
+
+The built-in extractor does not guess protocol semantics. A protocol collector must retain
+its raw response as a `RawEvidenceArtifact` and include the decoded values under
+`metadata.bridge_event`:
+
+```json
+{
+  "protocol": "Wormhole",
+  "direction": "SOURCE",
+  "message_id": "exact-protocol-message-id",
+  "transaction_id": "TX-source",
+  "transfer_id": "canonical-transfer-id"
+}
+```
+
+The extractor validates the protocol, direction, transfer reference, and exact message
+ID before persisting the event. A missing or conflicting message ID is rejected and no
+continuation can be created.

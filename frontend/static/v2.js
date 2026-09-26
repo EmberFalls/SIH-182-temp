@@ -104,6 +104,46 @@
       submit.disabled = false;
     }
   }
+  async function importRecordedCsv(event) {
+    event.preventDefault();
+    const form = event.target;
+    const submit = q("#csvImportForm button[value='default']");
+    submit.disabled = true;
+    try {
+      const values = Object.fromEntries(new FormData(form));
+      const payload = { case: JSON.parse(values.case_json), transfers_csv: values.transfers_csv };
+      const result = await request("/v2/imports/recorded-trace/csv", { body: JSON.stringify(payload) });
+      const caseRecord = await request(`/v2/cases/${result.case_id}`, { method: "GET" });
+      q("#csvImportDialog").close();
+      form.reset();
+      render({ ...result, case: caseRecord });
+    } catch (error) {
+      const notice = q("#notice");
+      if (notice) { notice.hidden = false; notice.className = "notice error"; notice.textContent = `Trace CSV was not imported: ${error.message}`; }
+    } finally {
+      submit.disabled = false;
+    }
+  }
+
+  async function importIntelligenceCsv(event) {
+    event.preventDefault();
+    const form = event.target;
+    const submit = q("#intelligenceImportForm button[value='default']");
+    submit.disabled = true;
+    try {
+      const values = Object.fromEntries(new FormData(form));
+      const outcome = await request("/v2/intelligence/import/assertions/csv", { body: JSON.stringify({ csv_text: values.csv_text }) });
+      q("#intelligenceImportDialog").close();
+      form.reset();
+      const notice = q("#notice");
+      if (notice) { notice.hidden = false; notice.className = outcome.rejected?.length ? "notice error" : "notice success"; notice.textContent = `Imported ${outcome.imported} intelligence assertion${outcome.imported === 1 ? "" : "s"}${outcome.rejected?.length ? `; ${outcome.rejected.length} row(s) need correction.` : "."}`; }
+    } catch (error) {
+      const notice = q("#notice");
+      if (notice) { notice.hidden = false; notice.className = "notice error"; notice.textContent = `Intelligence CSV was not imported: ${error.message}`; }
+    } finally {
+      submit.disabled = false;
+    }
+  }
   async function createLiveCase(event) {
     event.preventDefault();
     const values = Object.fromEntries(new FormData(event.target));
@@ -154,7 +194,11 @@
   }
 
   q("#importRecordedButton")?.addEventListener("click", () => q("#recordedImportDialog").showModal());
+  q("#importCsvButton")?.addEventListener("click", () => q("#csvImportDialog").showModal());
+  q("#intelligenceImportButton")?.addEventListener("click", () => q("#intelligenceImportDialog").showModal());
   q("#recordedImportForm")?.addEventListener("submit", importRecordedPackage);
+  q("#csvImportForm")?.addEventListener("submit", importRecordedCsv);
+  q("#intelligenceImportForm")?.addEventListener("submit", importIntelligenceCsv);
   q("#v2DemoButton")?.addEventListener("click", load);
   q("#newV2CaseButton")?.addEventListener("click", () => q("#v2CaseDialog").showModal());
   q("#v2CaseForm")?.addEventListener("submit", createLiveCase);

@@ -25,6 +25,7 @@ class Settings:
     etherscan_api_key: str = os.getenv("ETHERSCAN_API_KEY", "")
     investigator_api_keys: str = os.getenv("INVESTIGATOR_API_KEYS", "")
     database_path: str = os.getenv("DATABASE_PATH", "vasp_trace.db")
+    database_url: str = os.getenv("DATABASE_URL", "")
     max_hops: int = max(1, min(int(os.getenv("TRACE_MAX_HOPS", "3")), 5))
     max_wallets: int = max(1, min(int(os.getenv("TRACE_MAX_WALLETS", "16")), 40))
     max_provider_pages: int = max(1, min(int(os.getenv("TRACE_MAX_PROVIDER_PAGES", "5")), 20))

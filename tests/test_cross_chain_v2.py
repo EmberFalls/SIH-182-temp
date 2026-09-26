@@ -195,3 +195,62 @@ def test_cross_chain_api_persists_reviewed_route_link_and_continuation():
     })
     assert continuation.status_code == 200
     assert Decimal(continuation.json()["destination_attributed_amount"]) == Decimal("49.5")
+
+def test_normalized_bridge_events_resolve_only_on_exact_retained_message():
+    from backend.canonical import canonical_sha256
+    from backend.domain import RawEvidenceArtifact
+
+    bridge = app_module.store.create_entity(EntityCreate(canonical_name="Event Fixture Bridge", entity_type=EntityType.BRIDGE))
+    route_response = client.post("/v2/bridges/routes", json={
+        "bridge_entity_id": bridge.id, "protocol": "FixtureBridge",
+        "source_chain": "ETHEREUM", "source_bridge_address": SOURCE_BRIDGE,
+        "destination_chain": "POLYGON", "destination_bridge_address": DEST_BRIDGE,
+        "source_asset_contract": SOURCE_ASSET.contract_address,
+        "destination_asset_contract": DEST_ASSET.contract_address,
+        "route_evidence_id": "EVID-ROUTE-EVENT", "review_state": "REVIEWED",
+    })
+    assert route_response.status_code == 201
+    source = transfer("EVENT-SOURCE", Chain.ETHEREUM, SOURCE_USER, SOURCE_BRIDGE, SOURCE_ASSET, "100", 1)
+    destination = transfer("EVENT-DEST", Chain.POLYGON, DEST_BRIDGE, DEST_USER, DEST_ASSET, "99", 5)
+    for item, direction in ((source, "SOURCE"), (destination, "DESTINATION")):
+        app_module.store.save_raw_evidence_artifact_v2(RawEvidenceArtifact(
+            id=item.raw_evidence_id, kind="provider_response", provider="fixture_collector",
+            retrieved_at=NOW, content_hash_sha256=canonical_sha256({"id": item.raw_evidence_id}),
+            metadata={"bridge_event": {"protocol": "FixtureBridge", "direction": direction,
+                "message_id": "exact-event-message-0001", "transaction_id": item.transaction_id,
+                "transfer_id": item.id}},
+        ))
+    source_response = client.post("/v2/bridges/events/extract", json={
+        "protocol": "FixtureBridge", "direction": "SOURCE", "raw_evidence_id": source.raw_evidence_id,
+        "transfer": source.model_dump(mode="json"),
+    })
+    destination_response = client.post("/v2/bridges/events/extract", json={
+        "protocol": "FixtureBridge", "direction": "DESTINATION", "raw_evidence_id": destination.raw_evidence_id,
+        "transfer": destination.model_dump(mode="json"),
+    })
+    assert source_response.status_code == 201
+    assert destination_response.status_code == 201
+    link_response = client.post("/v2/cross-chain/links/resolve-events", json={
+        "route_id": route_response.json()["id"], "source_event_id": source_response.json()["id"],
+        "destination_event_id": destination_response.json()["id"],
+    })
+    assert link_response.status_code == 201
+    assert link_response.json()["message_id"] == "exact-event-message-0001"
+
+
+def test_bridge_event_extraction_rejects_evidence_without_exact_message():
+    from backend.canonical import canonical_sha256
+    from backend.domain import RawEvidenceArtifact
+
+    item = transfer("NO-MESSAGE", Chain.ETHEREUM, SOURCE_USER, SOURCE_BRIDGE, SOURCE_ASSET, "10", 1)
+    app_module.store.save_raw_evidence_artifact_v2(RawEvidenceArtifact(
+        id=item.raw_evidence_id, kind="provider_response", provider="fixture_collector", retrieved_at=NOW,
+        content_hash_sha256=canonical_sha256({"id": item.raw_evidence_id}),
+        metadata={"bridge_event": {"protocol": "FixtureBridge", "direction": "SOURCE", "transaction_id": item.transaction_id}},
+    ))
+    response = client.post("/v2/bridges/events/extract", json={
+        "protocol": "FixtureBridge", "direction": "SOURCE", "raw_evidence_id": item.raw_evidence_id,
+        "transfer": item.model_dump(mode="json"),
+    })
+    assert response.status_code == 422
+    assert "message" in response.json()["detail"].lower()
