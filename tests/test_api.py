@@ -291,3 +291,12 @@ def test_tron_transaction_seed_adapter_normalizes_confirmed_transfer():
     assert result.complete is True
     assert result.transfers[0].source_address.startswith("T")
     assert result.transfers[0].transaction_id.endswith("a" * 64)
+
+
+def test_v2_recorded_csv_import_replays_canonical_transfer():
+    asset = {"chain": "ETHEREUM", "symbol": "USDT", "contract_address": "0x" + "1" * 40, "decimals": 6}
+    seed_hash = "0x" + "2" * 64
+    csv_text = "id,transaction_id,source_address,destination_address,raw_amount,normalized_amount,timestamp,raw_evidence_id\nCSV-SEED,TX-ETHEREUM-" + seed_hash + ",0x" + "3" * 40 + ",0x" + "4" * 40 + ",25,25,2026-09-26T09:00:00Z,EVID-CSV\n"
+    response = client.post("/v2/imports/recorded-trace/csv", json={"case": {"title": "CSV recorded package", "context": {"seed_type": "transaction", "chain": "ETHEREUM", "seed_tx_hash": seed_hash, "asset": asset, "disputed_amount": "25", "incident_time": "2026-09-26T09:00:00Z", "data_mode": "RECORDED_REAL"}}, "transfers_csv": csv_text})
+    assert response.status_code == 201, response.text
+    assert response.json()["transfers"][0]["id"] == "CSV-SEED"

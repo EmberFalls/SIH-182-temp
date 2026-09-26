@@ -12,6 +12,7 @@ from .config import settings
 from .capabilities import ChainCapabilityV2, capability_matrix
 from .adapters import LegacyExplorerAdapter
 from .investigation_v2 import InvestigationRunnerV2
+from .imports_v2 import parse_recorded_transfers_csv
 from .demo import DemoScenarioService
 from .entity_resolution import EntityResolver
 from .cross_chain_v2 import (
@@ -30,6 +31,7 @@ from .domain import (
     CaseStatusUpdateV2,
     InvestigationTraceRequestV2,
     RecordedTraceImportV2,
+    RecordedTraceCsvImportV2,
     EntityRelationship,
     EntityRelationshipCreate,
     AssertionReviewV2,
@@ -169,6 +171,19 @@ async def import_recorded_trace_v2(payload: RecordedTraceImportV2, request: Requ
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     audit(request, "RECORDED_TRACE_IMPORTED", result.id, {"case_id": case.id, "transfer_count": len(payload.trace.recorded_transfers), "data_mode": result.data_mode.value})
+    return result
+
+@app.post("/v2/imports/recorded-trace/csv", response_model=InvestigationResultV2, status_code=status.HTTP_201_CREATED)
+async def import_recorded_trace_csv_v2(payload: RecordedTraceCsvImportV2, request: Request) -> InvestigationResultV2:
+    require_role(request, "investigator", "supervisor", "admin")
+    try:
+        transfers = parse_recorded_transfers_csv(payload.transfers_csv, payload.case)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    case = store.create_investigation_case_v2(payload.case, getattr(request.state, "actor", "local-development"))
+    trace_payload = InvestigationTraceRequestV2(recorded_transfers=transfers, recorded_evidence=payload.recorded_evidence)
+    result = await InvestigationRunnerV2(store, _v2_explorer_adapter).run(case, trace_payload)
+    audit(request, "RECORDED_TRACE_CSV_IMPORTED", result.id, {"case_id": case.id, "transfer_count": len(transfers), "data_mode": result.data_mode.value})
     return result
 
 @app.get("/v2/cases", response_model=list[InvestigationCaseV2])

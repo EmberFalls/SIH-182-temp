@@ -431,6 +431,17 @@ class RecordedTraceImportV2(BaseModel):
         return self
 
 
+class RecordedTraceCsvImportV2(BaseModel):
+    case: CaseCreateV2
+    transfers_csv: str = Field(min_length=50, max_length=5_000_000)
+    recorded_evidence: list[RawEvidenceArtifact] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_recorded_mode(self):
+        if self.case.context.data_mode not in {DataMode.RECORDED_REAL, DataMode.SYNTHETIC}:
+            raise ValueError("CSV replay requires a RECORDED_REAL or SYNTHETIC case data mode.")
+        return self
+
 class EntityRelationshipType(str, Enum):
     CLUSTER_MEMBER_OF = "CLUSTER_MEMBER_OF"
     OPERATED_BY = "OPERATED_BY"
