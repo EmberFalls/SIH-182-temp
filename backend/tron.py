@@ -41,6 +41,7 @@ class TronGridClient:
         pages = 0
         request_attempts = 0
         cursor = None
+        raw_pages: list[dict] = []
         async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
             while pages < settings.max_provider_pages and len(transfers) < limit:
                 page_params = {**params, "limit": min(100, limit - len(transfers))}
@@ -48,6 +49,7 @@ class TronGridClient:
                     page_params["fingerprint"] = cursor
                 body, attempts = await self._get_page(client, url, headers, page_params)
                 request_attempts += attempts
+                raw_pages.append(body)
                 pages += 1
                 for item in body.get("data", []):
                     token = item.get("token_info") or {}
@@ -59,7 +61,7 @@ class TronGridClient:
                     decimals = int(token.get("decimals") or 0)
                     transfers.append(TransferEvidence(
                         transaction_hash=item.get("transaction_id", ""), source_address=source, destination_address=destination,
-                        token_symbol=token.get("symbol", token_symbol).upper(), token_contract=token.get("address", ""), amount=Decimal(str(item.get("value", "0"))) / (Decimal(10) ** decimals),
+                        token_symbol=token.get("symbol", token_symbol).upper(), token_contract=token.get("address", ""), token_decimals=decimals, token_standard="TRC20", amount=Decimal(str(item.get("value", "0"))) / (Decimal(10) ** decimals),
                         timestamp=datetime.fromtimestamp(int(item.get("block_timestamp", 0)) / 1000, tz=timezone.utc), block_number=item.get("block", None), confirmed=True, provider=self.provider_name, retrieved_at=retrieved_at,
                     ))
                 cursor = (body.get("meta") or {}).get("fingerprint")
@@ -68,7 +70,8 @@ class TronGridClient:
         provenance = {
             "provider": self.provider_name, "endpoint": url, "parameters": params,
             "retrieved_at": retrieved_at.isoformat(), "accepted_records": len(transfers), "pages_retrieved": pages,
-            "provider_attempts": request_attempts, "pagination_truncated": bool(cursor), "cache": "MISS",
+            "provider_attempts": request_attempts, "pagination_truncated": bool(cursor), "has_more": bool(cursor), "next_cursor": cursor,
+            "bounded_by_limit": len(transfers) >= limit, "raw_responses": {"pages": raw_pages}, "cache": "MISS",
         }
         self._cache[cache_key] = (monotonic(), transfers, provenance)
         return transfers, provenance
@@ -102,12 +105,12 @@ class TronGridClient:
                 continue
             transfers.append(TransferEvidence(
                 transaction_hash=transaction_hash, source_address=str(source), destination_address=str(destination),
-                token_symbol=token_symbol.upper(), token_contract=contract, amount=amount,
+                token_symbol=token_symbol.upper(), token_contract=contract, token_decimals=decimals, token_standard="TRC20", amount=amount,
                 timestamp=datetime.fromtimestamp(int(event.get("block_timestamp", 0)) / 1000, tz=timezone.utc),
                 block_number=int(event["block_number"]) if event.get("block_number") is not None else None,
                 confirmed=True, provider=self.provider_name, retrieved_at=retrieved_at,
             ))
-        provenance = {"provider": self.provider_name, "endpoint": url, "parameters": {"only_confirmed": "true"}, "retrieved_at": retrieved_at.isoformat(), "accepted_records": len(transfers), "provider_attempts": attempts, "transaction_hash": transaction_hash}
+        provenance = {"provider": self.provider_name, "endpoint": url, "parameters": {"only_confirmed": "true"}, "retrieved_at": retrieved_at.isoformat(), "accepted_records": len(transfers), "provider_attempts": attempts, "transaction_hash": transaction_hash, "raw_responses": {"events": body}}
         return transfers, provenance
     async def _get_page(self, client: httpx.AsyncClient, url: str, headers: dict, params: dict) -> tuple[dict, int]:
         last_problem = "connection failure"

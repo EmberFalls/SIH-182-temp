@@ -132,9 +132,16 @@ class TransferEvidence(BaseModel):
     destination_address: str
     token_symbol: str
     token_contract: str
+    # Contract metadata is evidence, not a formatting choice.  An absent value is
+    # deliberately distinct from zero decimals; canonical adapters reject the
+    # former rather than deriving decimals from an observed transfer amount.
+    token_decimals: int | None = Field(default=None, ge=0, le=36)
+    token_standard: str | None = Field(default=None, max_length=40)
     amount: Decimal
     timestamp: datetime
     block_number: int | None
+    transaction_index: int | None = Field(default=None, ge=0)
+    log_index: int | None = Field(default=None, ge=0)
     confirmed: bool
     provider: str
     retrieved_at: datetime

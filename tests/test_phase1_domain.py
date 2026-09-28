@@ -39,6 +39,8 @@ class FakeEvmClient:
             destination_address=DESTINATION,
             token_symbol="USDT",
             token_contract="0x" + "C" * 40,
+            token_decimals=6,
+            token_standard="ERC20",
             amount=Decimal("125.500000"),
             timestamp=NOW,
             block_number=123,
@@ -62,6 +64,8 @@ def test_legacy_evm_adapter_returns_canonical_decimal_safe_transfer_and_safe_evi
     assert result.transfers[0].destination_address == DESTINATION.lower()
     assert result.transfers[0].normalized_amount == Decimal("125.500000")
     assert result.transfers[0].asset.symbol == "USDT"
+    assert result.transfers[0].asset.decimals == 6
+    assert result.transfers[0].asset.asset_key.endswith(":ERC20")
     assert result.evidence.request_fingerprint is not None
     assert "apikey" not in result.evidence.metadata["parameters"]
 
@@ -80,4 +84,6 @@ class FakeTronClient:
 def test_legacy_tron_adapter_marks_truncated_response_partial():
     result = asyncio.run(LegacyExplorerAdapter(Chain.TRON, FakeTronClient()).outgoing_transfers("T" + "A" * 33, "USDT", 10))
     assert result.complete is False
-    assert result.warnings == ["PARTIAL_PROVIDER_DATA"]
+    assert result.coverage is not None
+    assert result.coverage.coverage_status.value == "PROVIDER_TRUNCATED"
+    assert "COVERAGE_PROVIDER_TRUNCATED" in result.warnings

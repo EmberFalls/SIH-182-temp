@@ -1,14 +1,17 @@
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from io import BytesIO
 import hashlib
 import json
 from pathlib import Path
+from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from .config import settings
+from .canonical import canonical_sha256
 from .capabilities import ChainCapabilityV2, capability_matrix
 from .adapters import LegacyExplorerAdapter
 from .investigation_v2 import InvestigationRunnerV2
@@ -68,6 +71,10 @@ from .domain import (
     InvestigationCaseV2,
     InvestigationResultV2,
     RequestDraftV2,
+    CaseAnnotationCreateV2,
+    CaseAnnotationV2,
+    EvidenceIntegrityVerificationV2,
+    CaseConnectionV2,
     ResolvedEntityAssertion,
 )
 from .ml_v2 import (
@@ -212,6 +219,31 @@ def get_investigation_case_v2(case_id: str) -> InvestigationCaseV2:
     if not case:
         raise HTTPException(status_code=404, detail="V2 investigation case not found")
     return case
+
+
+@app.post("/v2/cases/{case_id}/annotations", response_model=CaseAnnotationV2, status_code=status.HTTP_201_CREATED)
+def create_case_annotation_v2(case_id: str, payload: CaseAnnotationCreateV2, request: Request) -> CaseAnnotationV2:
+    require_role(request, "investigator", "supervisor", "admin")
+    try:
+        annotation = store.create_case_annotation_v2(case_id, getattr(request.state, "actor", "local-development"), payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    audit(request, "CASE_ANNOTATION_CREATED", annotation.id, {"case_id": case_id, "target_type": annotation.target_type.value, "target_id": annotation.target_id, "note_type": annotation.note_type.value})
+    return annotation
+
+
+@app.get("/v2/cases/{case_id}/annotations", response_model=list[CaseAnnotationV2])
+def list_case_annotations_v2(case_id: str, target_type: str | None = None, target_id: str | None = None) -> list[CaseAnnotationV2]:
+    if not store.get_investigation_case_v2(case_id):
+        raise HTTPException(status_code=404, detail="V2 investigation case not found")
+    return store.list_case_annotations_v2(case_id, target_type, target_id)
+
+
+@app.get("/v2/cases/{case_id}/connections", response_model=list[CaseConnectionV2])
+def list_case_connections_v2(case_id: str) -> list[CaseConnectionV2]:
+    if not store.get_investigation_case_v2(case_id):
+        raise HTTPException(status_code=404, detail="V2 investigation case not found")
+    return store.list_case_connections_v2(case_id)
 @app.patch("/v2/cases/{case_id}/status", response_model=InvestigationCaseV2)
 def update_investigation_case_v2_status(case_id: str, payload: CaseStatusUpdateV2, request: Request) -> InvestigationCaseV2:
     case = store.update_investigation_case_v2_status(case_id, payload.status)
@@ -255,7 +287,7 @@ async def start_v2_trace_job(case_id: str, payload: InvestigationTraceRequestV2,
     case = store.get_investigation_case_v2(case_id)
     if not case:
         raise HTTPException(status_code=404, detail="V2 investigation case not found")
-    job = PersistentTraceJobsV2(store).submit(case.id, payload.model_dump(mode="json"), lambda: InvestigationRunnerV2(store, _v2_explorer_adapter).run(case, payload))
+    job = PersistentTraceJobsV2(store).submit(case.id, payload.model_dump(mode="json"), lambda progress, cancelled: InvestigationRunnerV2(store, _v2_explorer_adapter).run(case, payload, progress, cancelled))
     audit(request, "V2_TRACE_JOB_CREATED", job["job_id"], {"case_id": case_id})
     return job
 
@@ -271,12 +303,25 @@ async def retry_v2_trace_job(job_id: str, request: Request) -> dict:
         raise HTTPException(status_code=422, detail="The trace job's source case is no longer available.")
     try:
         payload = InvestigationTraceRequestV2.model_validate(existing.get("trace_request"))
-        job = PersistentTraceJobsV2(store).retry(job_id, lambda: InvestigationRunnerV2(store, _v2_explorer_adapter).run(case, payload))
+        job = PersistentTraceJobsV2(store).retry(job_id, lambda progress, cancelled: InvestigationRunnerV2(store, _v2_explorer_adapter).run(case, payload, progress, cancelled))
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     if not job:
         raise HTTPException(status_code=404, detail="V2 trace job not found")
     audit(request, "V2_TRACE_JOB_RETRIED", job_id, {"case_id": case.id, "attempt": job["attempt"]})
+    return job
+
+
+@app.post("/v2/trace-jobs/{job_id}/cancel")
+def cancel_v2_trace_job(job_id: str, request: Request) -> dict:
+    require_role(request, "investigator", "supervisor", "admin")
+    try:
+        job = PersistentTraceJobsV2(store).cancel(job_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    if not job:
+        raise HTTPException(status_code=404, detail="V2 trace job not found")
+    audit(request, "V2_TRACE_JOB_CANCELLATION_REQUESTED", job_id, {"case_id": job.get("case_id")})
     return job
 
 @app.get("/v2/trace-jobs")
@@ -574,6 +619,41 @@ def get_investigation_result_manifest_v2(result_id: str) -> dict:
     return result.evidence_manifest.model_dump(mode="json")
 
 
+@app.get("/v2/results/{result_id}/integrity", response_model=EvidenceIntegrityVerificationV2)
+def verify_investigation_result_integrity_v2(result_id: str) -> EvidenceIntegrityVerificationV2:
+    """Verify retained-record consistency without overstating provider truthfulness."""
+    result = store.get_investigation_result_v2(result_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="V2 investigation result not found")
+    warnings: list[str] = []
+    fingerprint_body = {"case_context": store.get_investigation_case_v2(result.case_id).context if store.get_investigation_case_v2(result.case_id) else None, "trace_policy": store.get_investigation_case_v2(result.case_id).trace_policy if store.get_investigation_case_v2(result.case_id) else None, "transfers": result.transfers, "flow": result.flow, "attribution": result.attribution, "deposit_inference_ids": [item.id for item in result.deposit_inferences]}
+    snapshot_valid = canonical_sha256(fingerprint_body) == result.trace_fingerprint
+    manifest_body = {key: getattr(result.evidence_manifest, key) for key in ("case_id", "result_version", "generated_at", "algorithm_versions", "evidence")}
+    manifest_valid = canonical_sha256(manifest_body) == result.evidence_manifest.sha256
+    raw_valid = True
+    for entry in result.evidence_manifest.evidence:
+        if not entry.id.startswith("raw_evidence:"):
+            continue
+        artifact = store.get_raw_evidence_artifact_v2(entry.id.removeprefix("raw_evidence:"))
+        if not artifact:
+            raw_valid = False
+            warnings.append(f"Missing retained raw evidence artifact {entry.id}.")
+            continue
+        has_payload = isinstance(artifact.metadata, dict) and "raw_payload" in artifact.metadata
+        payload = artifact.metadata.get("raw_payload") if isinstance(artifact.metadata, dict) else None
+        if has_payload and artifact.content_hash_sha256 and canonical_sha256(payload) != artifact.content_hash_sha256:
+            raw_valid = False
+            warnings.append(f"Raw evidence hash mismatch for {artifact.id}.")
+    audit_valid, audit_warnings = store.verify_audit_chain_v2()
+    warnings.extend(audit_warnings)
+    if not snapshot_valid:
+        warnings.append("Result snapshot fingerprint does not match the retained case, policy, and result content.")
+    if not manifest_valid:
+        warnings.append("Evidence manifest hash does not match its retained entries.")
+    warnings.append("Integrity verification proves stored-record consistency. It does not prove that an external provider originally supplied truthful data.")
+    return EvidenceIntegrityVerificationV2(result_id=result.id, result_snapshot_valid=snapshot_valid, manifest_valid=manifest_valid, raw_evidence_valid=raw_valid, audit_chain_valid=audit_valid, verified_at=datetime.now(timezone.utc), warnings=warnings)
+
+
 @app.get("/v2/results/{result_id}/report.pdf")
 def investigation_result_report_v2(result_id: str, request: Request) -> Response:
     result = store.get_investigation_result_v2(result_id)
@@ -585,6 +665,43 @@ def investigation_result_report_v2(result_id: str, request: Request) -> Response
     report = v2_report_renderer.render(case, result)
     audit(request, "V2_REPORT_EXPORTED", result.id, {"manifest_sha256": result.evidence_manifest.sha256})
     return Response(content=report, media_type="application/pdf", headers={"Content-Disposition": f'attachment; filename="{result.id}-investigation-report.pdf"'})
+
+
+@app.get("/v2/results/{result_id}/evidence-bundle.zip")
+def export_investigation_evidence_bundle_v2(result_id: str, request: Request) -> Response:
+    """Export a portable, evidence-referenced bundle from one immutable result."""
+    require_role(request, "investigator", "supervisor", "admin")
+    result = store.get_investigation_result_v2(result_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="V2 investigation result not found")
+    case = store.get_investigation_case_v2(result.case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail="V2 investigation case not found")
+    report = v2_report_renderer.render(case, result)
+    artifacts = {}
+    for entry in result.evidence_manifest.evidence:
+        if entry.id.startswith("raw_evidence:"):
+            artifact = store.get_raw_evidence_artifact_v2(entry.id.removeprefix("raw_evidence:"))
+            if artifact:
+                artifacts[artifact.id] = artifact.model_dump(mode="json")
+    files = {
+        "manifest.json": result.evidence_manifest.model_dump(mode="json"),
+        "case.json": case.model_dump(mode="json"),
+        "result.json": result.model_dump(mode="json"),
+        "evidence/raw-evidence.json": artifacts,
+        "audit.json": store.list_audit_chain_v2(),
+        "README.txt": "VASP Trace evidence bundle. Verify stored-record consistency with GET /v2/results/{result_id}/integrity. This bundle does not establish beneficial ownership or prove external-provider truthfulness.\n",
+    }
+    buffer = BytesIO()
+    with ZipFile(buffer, "w", compression=ZIP_DEFLATED) as archive:
+        for name, payload in files.items():
+            info = ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))
+            content = payload if isinstance(payload, str) else json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
+            archive.writestr(info, content.encode("utf-8"))
+        info = ZipInfo("report.pdf", date_time=(2026, 1, 1, 0, 0, 0))
+        archive.writestr(info, report)
+    audit(request, "V2_EVIDENCE_BUNDLE_EXPORTED", result.id, {"manifest_sha256": result.evidence_manifest.sha256, "artifact_count": len(artifacts)})
+    return Response(content=buffer.getvalue(), media_type="application/zip", headers={"Content-Disposition": f'attachment; filename="{result.id}-evidence-bundle.zip"'})
 
 
 @app.post("/v2/results/{result_id}/request-drafts", response_model=RequestDraftV2, status_code=status.HTTP_201_CREATED)

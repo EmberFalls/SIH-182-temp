@@ -48,6 +48,9 @@ class TerminalReason(str, Enum):
 
 class HistoricalBalanceQuality(str, Enum):
     EXACT = "EXACT"
+    RECONSTRUCTED_COMPLETE = "RECONSTRUCTED_COMPLETE"
+    # Compatibility value retained for old stored results. New producers must use
+    # RECONSTRUCTED_COMPLETE, PARTIAL, or UNKNOWN explicitly.
     RECONSTRUCTED = "RECONSTRUCTED"
     PARTIAL = "PARTIAL"
     UNKNOWN = "UNKNOWN"
@@ -67,8 +70,10 @@ def normalize_address(chain: Chain, address: str) -> str:
 
 class AssetRef(BaseModel):
     chain: Chain
+    asset_type: Literal["native", "token"] = "token"
     symbol: str = Field(min_length=2, max_length=24)
     contract_address: str | None = Field(default=None, min_length=1, max_length=100)
+    token_standard: str | None = Field(default=None, max_length=40)
     decimals: int = Field(ge=0, le=36)
     canonical_asset_id: str | None = Field(default=None, max_length=120)
 
@@ -81,6 +86,20 @@ class AssetRef(BaseModel):
     @classmethod
     def normalize_contract(cls, value: str | None) -> str | None:
         return value.lower() if value and value.startswith("0x") else value
+
+    @model_validator(mode="after")
+    def validate_asset_identity(self):
+        if self.asset_type == "token" and not self.contract_address:
+            raise ValueError("Token assets require a verified contract or mint address.")
+        if self.asset_type == "native" and self.contract_address:
+            raise ValueError("Native assets cannot include a token contract or mint address.")
+        return self
+
+    @property
+    def asset_key(self) -> str:
+        """Stable identity; a display symbol alone is never an asset identity."""
+        locator = self.contract_address or "NATIVE"
+        return f"{self.chain.value}:{self.asset_type}:{locator}:{self.token_standard or 'UNSPECIFIED'}"
 
 
 class CaseContextV2(BaseModel):
@@ -510,9 +529,14 @@ class CanonicalTransfer(BaseModel):
     raw_amount: Decimal = Field(ge=0)
     normalized_amount: Decimal = Field(ge=0)
     timestamp: datetime
+    block_number: int | None = Field(default=None, ge=0)
     transfer_type: Literal["native", "token", "internal", "utxo", "synthetic_bridge_edge"] = "token"
     log_index: int | None = Field(default=None, ge=0)
     event_index: int | None = Field(default=None, ge=0)
+    transaction_index: int | None = Field(default=None, ge=0)
+    parser_name: str = Field(default="legacy-explorer-adapter", min_length=1, max_length=120)
+    parser_version: str = Field(default="v2", min_length=1, max_length=120)
+    canonicalization_version: str = Field(default="v2", min_length=1, max_length=120)
     raw_evidence_id: str
 
     @model_validator(mode="after")
@@ -528,7 +552,38 @@ class ProviderAdapterResult(BaseModel):
     transfers: list[CanonicalTransfer]
     evidence: RawEvidenceArtifact
     complete: bool
+    coverage: "EvidenceCoverageRecord | None" = None
     warnings: list[str] = Field(default_factory=list)
+
+
+class CoverageStatus(str, Enum):
+    COMPLETE = "COMPLETE"
+    BOUNDED = "BOUNDED"
+    PROVIDER_TRUNCATED = "PROVIDER_TRUNCATED"
+    RATE_LIMITED = "RATE_LIMITED"
+    FAILED = "FAILED"
+
+
+class EvidenceCoverageRecord(BaseModel):
+    id: str
+    chain: Chain
+    subject: str
+    asset: AssetRef | None = None
+    provider: str
+    requested_start: datetime | None = None
+    requested_end: datetime | None = None
+    collected_start: datetime | None = None
+    collected_end: datetime | None = None
+    collection_start_block: int | None = Field(default=None, ge=0)
+    collection_end_block: int | None = Field(default=None, ge=0)
+    pages_collected: int = Field(default=0, ge=0)
+    complete: bool
+    coverage_status: CoverageStatus
+    reason_incomplete: str | None = None
+    has_more: bool = False
+    next_cursor: str | None = None
+    warnings: list[str] = Field(default_factory=list)
+    retrieved_at: datetime
 
 
 class EvidenceManifestEntry(BaseModel):
@@ -568,6 +623,7 @@ class InvestigationResultV2(BaseModel):
     attribution: AttributionSummaryV2
     deposit_inferences: list[DepositInferenceResult] = Field(default_factory=list)
     evidence_manifest: EvidenceManifestV2
+    coverage: list[EvidenceCoverageRecord] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
     methodology: dict[str, Any] = Field(default_factory=dict)
 
@@ -595,6 +651,75 @@ class RequestDraftV2(BaseModel):
     status: Literal["LOCAL_DRAFT_REQUIRES_AUTHORIZED_REVIEW"] = "LOCAL_DRAFT_REQUIRES_AUTHORIZED_REVIEW"
     created_at: datetime
     boundary_notice: str
+
+
+class AnnotationTargetType(str, Enum):
+    CASE = "CASE"
+    WALLET = "WALLET"
+    ENTITY = "ENTITY"
+    TRANSFER = "TRANSFER"
+    TRANSACTION = "TRANSACTION"
+    BRIDGE_LINK = "BRIDGE_LINK"
+    EVIDENCE = "EVIDENCE"
+
+
+class AnnotationType(str, Enum):
+    OBSERVATION = "OBSERVATION"
+    HYPOTHESIS = "HYPOTHESIS"
+    VERIFIED_FINDING = "VERIFIED_FINDING"
+    FOLLOW_UP = "FOLLOW_UP"
+    LEGAL_NOTE = "LEGAL_NOTE"
+    HANDOFF = "HANDOFF"
+
+
+class CaseAnnotationCreateV2(BaseModel):
+    target_type: AnnotationTargetType
+    target_id: str = Field(min_length=2, max_length=240)
+    note_type: AnnotationType = AnnotationType.OBSERVATION
+    body: str = Field(min_length=1, max_length=8_000)
+    assigned_to: str | None = Field(default=None, max_length=160)
+    due_at: datetime | None = None
+
+
+class CaseAnnotationV2(CaseAnnotationCreateV2):
+    id: str
+    case_id: str
+    author: str
+    created_at: datetime
+    updated_at: datetime
+    revision: int = Field(default=1, ge=1)
+
+
+class EvidenceIntegrityVerificationV2(BaseModel):
+    result_id: str
+    result_snapshot_valid: bool
+    manifest_valid: bool
+    raw_evidence_valid: bool
+    audit_chain_valid: bool
+    verified_at: datetime
+    warnings: list[str] = Field(default_factory=list)
+
+
+class CrossCaseConnectionType(str, Enum):
+    SAME_ADDRESS = "SAME_ADDRESS"
+    SAME_TRANSACTION = "SAME_TRANSACTION"
+    SAME_VERIFIED_ENTITY = "SAME_VERIFIED_ENTITY"
+    SAME_DEPOSIT_INFRASTRUCTURE = "SAME_DEPOSIT_INFRASTRUCTURE"
+    DIRECT_TRANSFER_BETWEEN_CASES = "DIRECT_TRANSFER_BETWEEN_CASES"
+    SHARED_COUNTERPARTY = "SHARED_COUNTERPARTY"
+
+
+class CaseConnectionV2(BaseModel):
+    id: str
+    source_case_id: str
+    related_case_id: str
+    source_result_id: str
+    related_result_id: str
+    connection_type: CrossCaseConnectionType
+    relation_key: str
+    evidence_ids: list[str] = Field(default_factory=list)
+    explanation: str
+    created_at: datetime
 
 class CaseStatusUpdateV2(BaseModel):
     status: Literal["OPEN", "UNDER_REVIEW", "CLOSED"]

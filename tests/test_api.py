@@ -284,7 +284,7 @@ def test_tron_transaction_seed_adapter_normalizes_confirmed_transfer():
 
     class FakeTronClient:
         async def transaction_trc20_transfers(self, tx_hash, symbol, contract, decimals):
-            return [TransferEvidence(transaction_hash=tx_hash, source_address="T" + "A" * 33, destination_address="T" + "B" * 33, token_symbol=symbol, token_contract=contract or "TR7", amount=Decimal("12.5"), timestamp=datetime(2026, 9, 26, tzinfo=timezone.utc), block_number=123, confirmed=True, provider="TronGrid", retrieved_at=datetime(2026, 9, 26, tzinfo=timezone.utc))], {"provider": "TronGrid", "endpoint": "https://api.trongrid.io/v1/transactions/test/events", "retrieved_at": "2026-09-26T00:00:00Z"}
+            return [TransferEvidence(transaction_hash=tx_hash, source_address="T" + "A" * 33, destination_address="T" + "B" * 33, token_symbol=symbol, token_contract=contract or "TR7", token_decimals=decimals, token_standard="TRC20", amount=Decimal("12.5"), timestamp=datetime(2026, 9, 26, tzinfo=timezone.utc), block_number=123, confirmed=True, provider="TronGrid", retrieved_at=datetime(2026, 9, 26, tzinfo=timezone.utc))], {"provider": "TronGrid", "endpoint": "https://api.trongrid.io/v1/transactions/test/events", "retrieved_at": "2026-09-26T00:00:00Z"}
 
     asset = AssetRef(chain=Chain.TRON, symbol="USDT", contract_address="TR7", decimals=6)
     result = asyncio.run(LegacyExplorerAdapter(Chain.TRON, FakeTronClient()).transaction_transfers("a" * 64, asset))

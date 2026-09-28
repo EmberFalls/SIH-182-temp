@@ -8,7 +8,7 @@ from typing import Any
 
 from .canonical import canonical_sha256
 from .config import settings
-from .domain import CaseCreateV2, InvestigationCaseV2, InvestigationResultV2, RequestDraftV2, FeatureSnapshotV2, TrainingDatasetV2, ModelVersionV2, ModelInferenceV2, RawEvidenceArtifact, AssertionReviewEventV2, EntityRelationship, EntityRelationshipCreate
+from .domain import CaseCreateV2, InvestigationCaseV2, InvestigationResultV2, RequestDraftV2, FeatureSnapshotV2, TrainingDatasetV2, ModelVersionV2, ModelInferenceV2, RawEvidenceArtifact, AssertionReviewEventV2, EntityRelationship, EntityRelationshipCreate, CaseAnnotationCreateV2, CaseAnnotationV2, CaseConnectionV2
 from .domain import (
     AssertionReviewState,
     AssertionType,
@@ -172,7 +172,28 @@ class Store:
                     id TEXT PRIMARY KEY, route_id TEXT NOT NULL, status TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS cross_chain_links_v2_route_idx
-                    ON cross_chain_links_v2(route_id, created_at DESC);            """)
+                    ON cross_chain_links_v2(route_id, created_at DESC);
+                CREATE TABLE IF NOT EXISTS case_annotations_v2 (
+                    id TEXT PRIMARY KEY, case_id TEXT NOT NULL, target_type TEXT NOT NULL, target_id TEXT NOT NULL,
+                    payload TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS case_annotations_v2_case_idx ON case_annotations_v2(case_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS case_annotations_v2_target_idx ON case_annotations_v2(target_type, target_id, created_at DESC);
+                CREATE TABLE IF NOT EXISTS case_connections_v2 (
+                    id TEXT PRIMARY KEY, source_case_id TEXT NOT NULL, related_case_id TEXT NOT NULL,
+                    source_result_id TEXT NOT NULL, related_result_id TEXT NOT NULL, connection_type TEXT NOT NULL,
+                    relation_key TEXT NOT NULL, payload TEXT NOT NULL, created_at TEXT NOT NULL,
+                    UNIQUE(source_result_id, related_result_id, connection_type, relation_key)
+                );
+                CREATE INDEX IF NOT EXISTS case_connections_v2_case_idx ON case_connections_v2(source_case_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS case_connections_v2_related_idx ON case_connections_v2(related_case_id, created_at DESC);
+                CREATE TABLE IF NOT EXISTS audit_chain_v2 (
+                    sequence INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT NOT NULL UNIQUE, actor TEXT NOT NULL,
+                    action TEXT NOT NULL, resource TEXT NOT NULL, detail TEXT NOT NULL, created_at TEXT NOT NULL,
+                    previous_hash TEXT, payload_hash TEXT NOT NULL, event_hash TEXT NOT NULL UNIQUE
+                );
+                CREATE INDEX IF NOT EXISTS audit_chain_v2_resource_idx ON audit_chain_v2(resource, sequence DESC);
+            """)
 
     def create_case(self, payload: CaseCreate) -> CaseSummary:
         created_at = _utcnow()
@@ -639,6 +660,50 @@ class Store:
         with self._connection() as connection:
             row = connection.execute("SELECT payload FROM deposit_inferences WHERE id = ?", (inference_id,)).fetchone()
         return DepositInferenceResult.model_validate_json(row["payload"]) if row else None
+
+    def create_case_annotation_v2(self, case_id: str, author: str, payload: CaseAnnotationCreateV2) -> CaseAnnotationV2:
+        if not self.get_investigation_case_v2(case_id):
+            raise ValueError("V2 investigation case not found.")
+        now = _utcnow()
+        annotation = CaseAnnotationV2(
+            id=f"ANNOT-{uuid.uuid4().hex[:12].upper()}", case_id=case_id, author=author,
+            created_at=now, updated_at=now, **payload.model_dump(),
+        )
+        with self._connection() as connection:
+            connection.execute(
+                "INSERT INTO case_annotations_v2 VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (annotation.id, case_id, annotation.target_type.value, annotation.target_id,
+                 json.dumps(annotation.model_dump(mode="json"), default=_json_default, sort_keys=True), now.isoformat(), now.isoformat()),
+            )
+        return annotation
+
+    def list_case_annotations_v2(self, case_id: str, target_type: str | None = None, target_id: str | None = None) -> list[CaseAnnotationV2]:
+        query = "SELECT payload FROM case_annotations_v2 WHERE case_id = ?"
+        params: list[Any] = [case_id]
+        if target_type:
+            query += " AND target_type = ?"
+            params.append(target_type)
+        if target_id:
+            query += " AND target_id = ?"
+            params.append(target_id)
+        query += " ORDER BY created_at ASC"
+        with self._connection() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [CaseAnnotationV2.model_validate_json(row["payload"]) for row in rows]
+
+    def save_case_connection_v2(self, connection: CaseConnectionV2) -> CaseConnectionV2:
+        serialized = json.dumps(connection.model_dump(mode="json"), default=_json_default, sort_keys=True)
+        with self._connection() as db:
+            existing = db.execute("SELECT payload FROM case_connections_v2 WHERE source_result_id = ? AND related_result_id = ? AND connection_type = ? AND relation_key = ?", (connection.source_result_id, connection.related_result_id, connection.connection_type.value, connection.relation_key)).fetchone()
+            if existing:
+                return CaseConnectionV2.model_validate_json(existing["payload"])
+            db.execute("INSERT INTO case_connections_v2 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", (connection.id, connection.source_case_id, connection.related_case_id, connection.source_result_id, connection.related_result_id, connection.connection_type.value, connection.relation_key, serialized, connection.created_at.isoformat()))
+        return connection
+
+    def list_case_connections_v2(self, case_id: str) -> list[CaseConnectionV2]:
+        with self._connection() as db:
+            rows = db.execute("SELECT payload FROM case_connections_v2 WHERE source_case_id = ? OR related_case_id = ? ORDER BY created_at DESC", (case_id, case_id)).fetchall()
+        return [CaseConnectionV2.model_validate_json(row["payload"]) for row in rows]
     def update_case(self, case_id: str, update: CaseUpdate) -> CaseSummary | None:
         case = self.get_case(case_id)
         if not case:
@@ -733,16 +798,48 @@ class Store:
 
     def record_audit(self, actor: str, action: str, resource: str, detail: dict[str, Any] | None = None) -> None:
         created_at = _utcnow()
+        event_id = f"AUDIT-{uuid.uuid4().hex[:12].upper()}"
+        serialized_detail = json.dumps(detail or {}, default=_json_default, sort_keys=True)
         with self._connection() as connection:
             connection.execute("INSERT INTO audit_events VALUES (?, ?, ?, ?, ?, ?)", (
-                f"AUDIT-{uuid.uuid4().hex[:12].upper()}", actor, action, resource,
-                json.dumps(detail or {}, default=_json_default, sort_keys=True), created_at.isoformat(),
+                event_id, actor, action, resource, serialized_detail, created_at.isoformat(),
             ))
+            previous = connection.execute("SELECT event_hash FROM audit_chain_v2 ORDER BY sequence DESC LIMIT 1").fetchone()
+            previous_hash = previous["event_hash"] if previous else None
+            body = {"id": event_id, "actor": actor, "action": action, "resource": resource, "detail": json.loads(serialized_detail), "created_at": created_at, "previous_hash": previous_hash}
+            payload_hash = canonical_sha256(body)
+            event_hash = canonical_sha256({"previous_hash": previous_hash, "payload_hash": payload_hash})
+            connection.execute(
+                "INSERT INTO audit_chain_v2 (id, actor, action, resource, detail, created_at, previous_hash, payload_hash, event_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (event_id, actor, action, resource, serialized_detail, created_at.isoformat(), previous_hash, payload_hash, event_hash),
+            )
 
     def list_audit(self, limit: int = 100) -> list[dict[str, Any]]:
         with self._connection() as connection:
             rows = connection.execute("SELECT id, actor, action, resource, detail, created_at FROM audit_events ORDER BY created_at DESC LIMIT ?", (limit,)).fetchall()
         return [{**dict(row), "detail": json.loads(row["detail"])} for row in rows]
+
+    def list_audit_chain_v2(self, resource: str | None = None) -> list[dict[str, Any]]:
+        with self._connection() as connection:
+            if resource:
+                rows = connection.execute("SELECT sequence, id, actor, action, resource, detail, created_at, previous_hash, payload_hash, event_hash FROM audit_chain_v2 WHERE resource = ? ORDER BY sequence ASC", (resource,)).fetchall()
+            else:
+                rows = connection.execute("SELECT sequence, id, actor, action, resource, detail, created_at, previous_hash, payload_hash, event_hash FROM audit_chain_v2 ORDER BY sequence ASC").fetchall()
+        return [{**dict(row), "detail": json.loads(row["detail"])} for row in rows]
+
+    def verify_audit_chain_v2(self) -> tuple[bool, list[str]]:
+        previous_hash: str | None = None
+        warnings: list[str] = []
+        for event in self.list_audit_chain_v2():
+            if event["previous_hash"] != previous_hash:
+                warnings.append(f"Audit chain discontinuity at sequence {event['sequence']}.")
+            body = {"id": event["id"], "actor": event["actor"], "action": event["action"], "resource": event["resource"], "detail": event["detail"], "created_at": datetime.fromisoformat(event["created_at"]), "previous_hash": event["previous_hash"]}
+            expected_payload = canonical_sha256(body)
+            expected_event = canonical_sha256({"previous_hash": event["previous_hash"], "payload_hash": expected_payload})
+            if event["payload_hash"] != expected_payload or event["event_hash"] != expected_event:
+                warnings.append(f"Audit hash verification failed at sequence {event['sequence']}.")
+            previous_hash = event["event_hash"]
+        return not warnings, warnings
 
     @staticmethod
     def _normalized_address(address: str, chain: str) -> str:

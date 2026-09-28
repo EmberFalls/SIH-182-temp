@@ -27,6 +27,10 @@ from .domain import (
 
 
 ZERO = Decimal("0")
+
+
+class TraceCancelled(RuntimeError):
+    """Raised only at a safe processing boundary before further expansion."""
 UNRESOLVED_REASONS = {
     TerminalReason.MIXER_BOUNDARY,
     TerminalReason.BRIDGE_UNRESOLVED,
@@ -130,11 +134,12 @@ class FundFlowEngineV2:
     than plain graph reachability and keeps a lineage from every child allocation.
     """
 
-    def __init__(self, transfer_repository: TransferRepository, balance_provider: HistoricalBalanceProvider, policy: FundAllocationPolicy | None = None, terminal_classifier: TerminalClassifier | None = None) -> None:
+    def __init__(self, transfer_repository: TransferRepository, balance_provider: HistoricalBalanceProvider, policy: FundAllocationPolicy | None = None, terminal_classifier: TerminalClassifier | None = None, should_cancel: Callable[[], bool] | None = None) -> None:
         self.transfer_repository = transfer_repository
         self.balance_provider = balance_provider
         self.policy = policy or ProportionalHaircutPolicy()
         self.terminal_classifier = terminal_classifier or (lambda _: None)
+        self.should_cancel = should_cancel or (lambda: False)
 
     async def trace(self, seed: FlowSeed, trace_policy: TracePolicyV2) -> FundFlowResultV2:
         if trace_policy.allocation_policy != self.policy.name:
@@ -156,6 +161,8 @@ class FundFlowEngineV2:
         node_addresses: set[tuple[str, str]] = set()
 
         while queue:
+            if self.should_cancel():
+                raise TraceCancelled("Trace cancellation was requested before further flow expansion.")
             event = heapq.heappop(queue)
             if trace_policy.end_time and event.timestamp > trace_policy.end_time:
                 if event.kind == "arrival":
@@ -186,7 +193,16 @@ class FundFlowEngineV2:
                     terminals.append(self._terminal(arrival.address, arrival.amount, TerminalReason.UNKNOWN, arrival.depth, arrival.parent_ids, f"Provider retrieval failed: {exc}"))
                     warnings.append("PARTIAL_PROVIDER_DATA")
                     continue
-                outgoing = sorted((item for item in outgoing if item.timestamp >= arrival.timestamp and (end_time is None or item.timestamp <= end_time)), key=lambda item: (item.timestamp, item.id))
+                outgoing = sorted(
+                    (item for item in outgoing if item.timestamp >= arrival.timestamp and (end_time is None or item.timestamp <= end_time)),
+                    key=lambda item: (
+                        item.block_number if item.block_number is not None else -1,
+                        item.transaction_index if item.transaction_index is not None else -1,
+                        item.log_index if item.log_index is not None else -1,
+                        item.timestamp,
+                        item.id,
+                    ),
+                )
                 if not outgoing:
                     state.tainted = max(ZERO, state.tainted - arrival.amount)
                     terminals.append(self._terminal(arrival.address, arrival.amount, TerminalReason.NO_OUTGOING, arrival.depth, arrival.parent_ids, "No matching outbound transfer was available after this flow arrival."))
@@ -253,7 +269,7 @@ class FundFlowEngineV2:
 
     @staticmethod
     def _asset_key(asset: AssetRef) -> str:
-        return f"{asset.chain.value}:{asset.contract_address or asset.symbol}:{asset.symbol}"
+        return asset.asset_key
 
     @staticmethod
     def _terminal(address: str, amount: Decimal, reason: TerminalReason, depth: int, parent_ids: list[str], detail: str) -> FlowTerminalV2:

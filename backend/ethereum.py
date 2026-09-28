@@ -48,11 +48,13 @@ class EvmScanClient:
         normalized_address = address.lower()
         pages = 0
         request_attempts = 0
+        raw_pages: list[dict] = []
         async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
             while pages < settings.max_provider_pages and len(transfers) < limit:
                 page_params = {**params, "page": pages + 1, "offset": min(100, limit - len(transfers))}
                 body, attempts = await self._get_page(client, page_params)
                 request_attempts += attempts
+                raw_pages.append(body)
                 if body.get("status") == "0" and body.get("message") != "No transactions found":
                     raise ProviderUnavailable(f"Etherscan returned an error: {body.get('result')}")
                 records = body.get("result", []) if isinstance(body.get("result"), list) else []
@@ -65,6 +67,7 @@ class EvmScanClient:
                         transaction_hash=item.get("hash", ""), source_address=item.get("from", "").lower(), destination_address=item.get("to", "").lower(),
                         token_symbol=item.get("tokenSymbol", token_symbol).upper(), token_contract=item.get("contractAddress", "").lower(), amount=Decimal(str(item.get("value", "0"))) / (Decimal(10) ** decimals),
                         timestamp=datetime.fromtimestamp(int(item.get("timeStamp", 0)), tz=timezone.utc), block_number=int(item["blockNumber"]) if item.get("blockNumber") else None,
+                        token_decimals=decimals, token_standard="ERC20", transaction_index=int(item["transactionIndex"]) if item.get("transactionIndex") else None,
                         confirmed=True, provider=f"{self.provider_name} ({self.chain_name})", retrieved_at=retrieved_at,
                     ))
                 if len(records) < page_params["offset"]:
@@ -72,7 +75,10 @@ class EvmScanClient:
         provenance = {"provider": self.provider_name, "endpoint": self.base_url, "parameters": {key: value for key, value in params.items() if key != "apikey"},
                       "retrieved_at": retrieved_at.isoformat(), "accepted_records": len(transfers), "pages_retrieved": pages,
                       "provider_attempts": request_attempts,
-                      "pagination_truncated": pages >= settings.max_provider_pages and len(transfers) >= limit, "cache": "MISS"}
+                      "pagination_truncated": pages >= settings.max_provider_pages and len(transfers) >= limit,
+                      "bounded_by_limit": len(transfers) >= limit,
+                      "has_more": len(records) == page_params["offset"] if pages else False,
+                      "raw_responses": {"pages": raw_pages}, "cache": "MISS"}
         self._cache[cache_key] = (monotonic(), transfers, provenance)
         return transfers, provenance
 
@@ -113,9 +119,10 @@ class EvmScanClient:
                 transaction_hash=transaction_hash, source_address=source, destination_address=destination,
                 token_symbol=token_symbol.upper(), token_contract=token_contract.lower(), amount=amount,
                 timestamp=timestamp, block_number=block_number, confirmed=True,
+                token_decimals=decimals, token_standard="ERC20", log_index=int(str(log.get("logIndex", "0x0")), 16),
                 provider=f"{self.provider_name} ({self.chain_name})", retrieved_at=retrieved_at,
             ))
-        provenance = {"provider": self.provider_name, "endpoint": self.base_url, "parameters": {"chainid": self.chain_id, "module": "proxy", "action": "eth_getTransactionReceipt", "txhash": transaction_hash}, "retrieved_at": retrieved_at.isoformat(), "accepted_records": len(transfers), "provider_attempts": receipt_attempts + block_attempts, "transaction_hash": transaction_hash, "receipt_block": block_number, "receipt_logs": receipt.get("logs") or []}
+        provenance = {"provider": self.provider_name, "endpoint": self.base_url, "parameters": {"chainid": self.chain_id, "module": "proxy", "action": "eth_getTransactionReceipt", "txhash": transaction_hash}, "retrieved_at": retrieved_at.isoformat(), "accepted_records": len(transfers), "provider_attempts": receipt_attempts + block_attempts, "transaction_hash": transaction_hash, "receipt_block": block_number, "receipt_logs": receipt.get("logs") or [], "raw_responses": {"receipt": receipt_body, "block": block_body}}
         return transfers, provenance
     async def _get_page(self, client: httpx.AsyncClient, params: dict) -> tuple[dict, int]:
         """Fetch one page with pacing and bounded retries, without leaking the API key."""

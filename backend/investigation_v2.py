@@ -13,6 +13,7 @@ from .domain import (
     AssetRef,
     CanonicalTransfer,
     CaseContextV2,
+    EvidenceCoverageRecord,
     DataMode,
     FlowSeed,
     HistoricalBalanceQuality,
@@ -44,19 +45,22 @@ class ProviderSnapshotRepository:
         self._transfers: list[CanonicalTransfer] = []
         self._loaded_addresses: set[str] = set()
         self.warnings: list[str] = []
+        self.coverage: list[EvidenceCoverageRecord] = []
 
     @property
     def transfers(self) -> list[CanonicalTransfer]:
-        return sorted(self._transfers, key=lambda item: (item.timestamp, item.id))
+        return sorted(self._transfers, key=lambda item: (item.block_number if item.block_number is not None else -1, item.transaction_index if item.transaction_index is not None else -1, item.log_index if item.log_index is not None else -1, item.timestamp, item.id))
 
     async def load(self, address: str, asset: AssetRef) -> None:
         normalized = address.lower() if address.startswith("0x") else address
         if normalized in self._loaded_addresses:
             return
         self._loaded_addresses.add(normalized)
-        result = await self.adapter_factory(asset.chain).outgoing_transfers(normalized, asset.symbol, self.limit)
+        result = await self.adapter_factory(asset.chain).outgoing_transfers(normalized, asset, self.limit)
         self.store.save_raw_evidence_artifact_v2(result.evidence)
         self.warnings.extend(result.warnings)
+        if result.coverage:
+            self.coverage.append(result.coverage)
         known = {item.id for item in self._transfers}
         self._transfers.extend(item for item in result.transfers if item.id not in known and self._matches_asset(item, asset))
 
@@ -64,6 +68,8 @@ class ProviderSnapshotRepository:
         result = await self.adapter_factory(asset.chain).transaction_transfers(transaction_hash, asset)
         self.store.save_raw_evidence_artifact_v2(result.evidence)
         self.warnings.extend(result.warnings)
+        if result.coverage:
+            self.coverage.append(result.coverage)
         known = {item.id for item in self._transfers}
         self._transfers.extend(item for item in result.transfers if item.id not in known and self._matches_asset(item, asset))
     async def outgoing_transfers(self, address: str, asset: AssetRef, start_time: datetime, end_time: datetime | None) -> list[CanonicalTransfer]:
@@ -76,30 +82,21 @@ class ProviderSnapshotRepository:
 
     @staticmethod
     def _matches_asset(transfer: CanonicalTransfer, asset: AssetRef) -> bool:
-        if transfer.asset.symbol != asset.symbol:
-            return False
-        if asset.contract_address and transfer.asset.contract_address:
-            return transfer.asset.contract_address.lower() == asset.contract_address.lower()
-        return True
+        return transfer.asset.asset_key == asset.asset_key
 
 
 class RecordedSnapshotRepository:
     """Immutable caller-supplied evidence replay. No network requests are made."""
 
     def __init__(self, transfers: list[CanonicalTransfer]) -> None:
-        self._transfers = sorted(transfers, key=lambda item: (item.timestamp, item.id))
+        self._transfers = sorted(transfers, key=lambda item: (item.block_number if item.block_number is not None else -1, item.transaction_index if item.transaction_index is not None else -1, item.log_index if item.log_index is not None else -1, item.timestamp, item.id))
         self.warnings: list[str] = []
+        self.coverage: list[EvidenceCoverageRecord] = []
 
     @property
     def transfers(self) -> list[CanonicalTransfer]:
         return self._transfers
 
-    async def load_transaction(self, transaction_hash: str, asset: AssetRef) -> None:
-        result = await self.adapter_factory(asset.chain).transaction_transfers(transaction_hash, asset)
-        self.store.save_raw_evidence_artifact_v2(result.evidence)
-        self.warnings.extend(result.warnings)
-        known = {item.id for item in self._transfers}
-        self._transfers.extend(item for item in result.transfers if item.id not in known and self._matches_asset(item, asset))
     async def outgoing_transfers(self, address: str, asset: AssetRef, start_time: datetime, end_time: datetime | None) -> list[CanonicalTransfer]:
         normalized = address.lower() if address.startswith("0x") else address
         return [
@@ -153,23 +150,34 @@ class InvestigationRunnerV2:
         self.store = store
         self.adapter_factory = adapter_factory
 
-    async def run(self, case: InvestigationCaseV2, request: InvestigationTraceRequestV2) -> InvestigationResultV2:
+    async def run(self, case: InvestigationCaseV2, request: InvestigationTraceRequestV2, progress: Callable[[str], None] | None = None, should_cancel: Callable[[], bool] | None = None) -> InvestigationResultV2:
+        progress = progress or (lambda _stage: None)
+        should_cancel = should_cancel or (lambda: False)
         self._validate_mode(case.context, request)
         policy = request.trace_policy or case.trace_policy
+        progress("collecting evidence")
         repository = await self._repository(case, request)
+        if should_cancel():
+            from .flow_v2 import TraceCancelled
+            raise TraceCancelled("Trace cancellation was requested after evidence collection.")
+        progress("resolving seed transfer")
         seed = await self._seed(case, request, repository)
         resolver = EntityResolver(self.store)
+        progress("computing disputed-fund allocation")
         engine = FundFlowEngineV2(
             repository,
             ObservedLedgerBalances(repository),
             terminal_classifier=lambda transfer: self._terminal_reason(resolver, transfer),
+            should_cancel=should_cancel,
         )
         flow = await engine.trace(seed, policy)
         transfers = repository.transfers
+        progress("resolving entity intelligence")
         observed_at = max((item.timestamp for item in transfers), default=datetime.now(timezone.utc))
         inferences = self._infer_deposits(resolver, transfers, case.context.asset, observed_at)
         attribution = AttributionEngineV2(resolver).build(flow, case.context.chain.value, observed_at)
         limitations = self._limitations(case, repository, transfers, seed)
+        progress("creating immutable result snapshot")
         return InvestigationResultService(self.store).create(
             case=case,
             flow=flow,
@@ -178,6 +186,7 @@ class InvestigationRunnerV2:
             deposit_inferences=inferences,
             limitations=limitations,
             generated_at=datetime.now(timezone.utc),
+            coverage=list(getattr(repository, "coverage", [])),
         )
 
     async def _repository(self, case: InvestigationCaseV2, request: InvestigationTraceRequestV2):

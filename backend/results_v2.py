@@ -13,6 +13,7 @@ from .canonical import (
 )
 from .domain import (
     CanonicalTransfer,
+    EvidenceCoverageRecord,
     DepositInferenceResult,
     EvidenceManifestEntry,
     EvidenceManifestV2,
@@ -39,6 +40,7 @@ class InvestigationResultService:
         deposit_inferences: list[DepositInferenceResult],
         limitations: list[str],
         generated_at: datetime | None = None,
+        coverage: list[EvidenceCoverageRecord] | None = None,
     ) -> InvestigationResultV2:
         generated_at = generated_at or datetime.now(timezone.utc)
         trace_fingerprint = canonical_sha256({"case_context": case.context, "trace_policy": case.trace_policy, "transfers": transfers, "flow": flow, "attribution": attribution, "deposit_inference_ids": [item.id for item in deposit_inferences]})
@@ -76,6 +78,7 @@ class InvestigationResultService:
             attribution=attribution,
             deposit_inferences=deposit_inferences,
             evidence_manifest=manifest,
+            coverage=coverage or [],
             limitations=sorted(set(limitations)),
             methodology={
                 **flow.methodology,
@@ -84,7 +87,12 @@ class InvestigationResultService:
                 "interpretation_boundary": "Attribution identifies evidence-supported custodial endpoints; it does not establish beneficial ownership or authorize a freeze.",
             },
         )
-        return self.store.save_investigation_result_v2(result)
+        saved = self.store.save_investigation_result_v2(result)
+        # Cross-case relations are derived from immutable saved evidence. They are
+        # secondary analysis and never block primary trace completion.
+        from .case_connections_v2 import CrossCaseIndexerV2
+        CrossCaseIndexerV2(self.store).index(saved)
+        return saved
 
     def _evidence_entries(
         self,

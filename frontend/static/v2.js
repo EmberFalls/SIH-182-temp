@@ -50,6 +50,10 @@
     q("#v2DataMode").textContent = result.data_mode === "LIVE" ? "LIVE BLOCKCHAIN DATA" : result.data_mode === "RECORDED_REAL" ? "RECORDED REAL BLOCKCHAIN SNAPSHOT" : "SYNTHETIC DEMO — NOT A REAL ATTRIBUTION";
     q("#v2DataMode").className = `data-mode ${String(result.data_mode || "SYNTHETIC").toLowerCase()}`;
     q("#v2Limitation").textContent = (result.limitations || []).join(" ");
+    const coverage = result.coverage || [];
+    q("#v2Coverage").innerHTML = coverage.length
+      ? coverage.map(item => `<div class="coverage-record ${escapeHtml(String(item.coverage_status || "UNKNOWN").toLowerCase())}"><b>${escapeHtml(item.coverage_status.replaceAll("_", " "))}</b><span>${escapeHtml(item.provider)} · <code>${escapeHtml(short(item.subject))}</code> · ${item.pages_collected} page${item.pages_collected === 1 ? "" : "s"}</span>${item.reason_incomplete ? `<small>${escapeHtml(item.reason_incomplete)}</small>` : ""}</div>`).join("")
+      : `<div class="coverage-record recorded"><b>${result.data_mode === "SYNTHETIC" ? "SYNTHETIC EVIDENCE" : "RECORDED EVIDENCE"}</b><span>No live-provider coverage claim is made for this result.</span></div>`;
     q("#v2Disputed").textContent = `${money(flow.seed_amount)} ${asset}`;
     q("#v2Accounted").textContent = `${money(flow.terminal_amount)} ${asset}`;
     q("#v2Unresolved").textContent = `${money(flow.unresolved_amount)} ${asset}`;
@@ -72,6 +76,8 @@
     q("#v2Inferences").innerHTML = inferences.length ? inferences.map(inference => `<button class="v2-inference-card" data-inference="${escapeHtml(inference.id)}"><span class="claim-state inferred">Rule inferred · awaiting review</span><strong>Probable ${escapeHtml(inference.candidate_entity_name)} deposit endpoint</strong><p><code>${escapeHtml(short(inference.address))}</code> · ${inference.evidence_score}/100 rule evidence</p><small>${escapeHtml(inference.reasons[0] || "No explanation recorded.")}</small></button>`).join("") : '<p class="empty">No deposit-pattern hypothesis was generated.</p>';
     q("#v2Inferences").querySelectorAll("[data-inference]").forEach(button => button.onclick = () => showInference(inferences.find(item => item.id === button.dataset.inference)));
     renderActionability(result.id, asset);
+    renderConnections(result.case.id);
+    renderAnnotations(result.case.id);
     q("#v2EvidenceType").textContent = "None";
     q("#v2Evidence").innerHTML = '<p class="empty">Select an endpoint or deposit inference to inspect its evidence.</p>';
   }
@@ -93,6 +99,51 @@
     } catch (error) {
       target.innerHTML = `<p class="empty">Actionability assessment unavailable: ${escapeHtml(error.message)}</p>`;
     }
+  }
+
+  async function renderConnections(caseId) {
+    const target = q("#v2Connections");
+    if (!target || !caseId) return;
+    target.innerHTML = '<p class="empty">Checking permitted saved-case connections…</p>';
+    try {
+      const connections = await request(`/v2/cases/${caseId}/connections`, { method: "GET" });
+      if (resultState?.case?.id !== caseId) return;
+      target.innerHTML = connections.length ? connections.map(item => `<article class="v2-inference-card"><span class="claim-state verified">${escapeHtml(item.connection_type.replaceAll("_", " "))}</span><strong>${escapeHtml(item.related_case_id)}</strong><p><code>${escapeHtml(short(item.relation_key))}</code></p><small>${escapeHtml(item.explanation)}</small></article>`).join("") : '<p class="empty">No exact shared address, transaction, or reviewed entity has been recorded with another accessible case.</p>';
+    } catch (error) { target.innerHTML = `<p class="empty">Case connections unavailable: ${escapeHtml(error.message)}</p>`; }
+  }
+
+  async function renderAnnotations(caseId) {
+    const target = q("#v2Annotations");
+    if (!target || !caseId) return;
+    try {
+      const notes = await request(`/v2/cases/${caseId}/annotations`, { method: "GET" });
+      if (resultState?.case?.id !== caseId) return;
+      target.innerHTML = notes.length ? notes.map(item => `<article class="v2-transfer-row"><span><b>${escapeHtml(item.note_type.replaceAll("_", " "))}</b><small>${escapeHtml(item.author)} · ${escapeHtml(dateText(item.created_at))}</small></span><span>${escapeHtml(item.body)}</span></article>`).join("") : '<p class="empty">No investigator notes have been recorded.</p>';
+    } catch (error) { target.innerHTML = `<p class="empty">Case notes unavailable: ${escapeHtml(error.message)}</p>`; }
+  }
+
+  async function verifyIntegrity() {
+    const target = q("#v2Integrity");
+    if (!resultState?.id || !target) return;
+    target.innerHTML = '<p class="empty">Verifying retained hashes and audit continuity…</p>';
+    try {
+      const integrity = await request(`/v2/results/${resultState.id}/integrity`, { method: "GET" });
+      const checks = [["Result snapshot", integrity.result_snapshot_valid], ["Evidence manifest", integrity.manifest_valid], ["Raw evidence", integrity.raw_evidence_valid], ["Audit chain", integrity.audit_chain_valid]];
+      target.innerHTML = `<article class="v2-inference-card"><span class="claim-state ${checks.every(([, value]) => value) ? "verified" : "inferred"}">${checks.every(([, value]) => value) ? "Stored records consistent" : "Verification requires review"}</span>${checks.map(([label, value]) => `<p><b>${escapeHtml(label)}:</b> ${value ? "verified" : "failed"}</p>`).join("")}${integrity.warnings.map(item => `<small>${escapeHtml(item)}</small>`).join("")}</article>`;
+    } catch (error) { target.innerHTML = `<p class="empty">Integrity verification failed: ${escapeHtml(error.message)}</p>`; }
+  }
+
+  async function addAnnotation(event) {
+    event.preventDefault();
+    if (!resultState?.case?.id) return;
+    const form = event.target;
+    const values = Object.fromEntries(new FormData(form));
+    try {
+      await request(`/v2/cases/${resultState.case.id}/annotations`, { body: JSON.stringify({ target_type: "CASE", target_id: resultState.case.id, note_type: values.note_type, body: values.body }) });
+      form.reset();
+      await renderAnnotations(resultState.case.id);
+      notice("Investigator note recorded.");
+    } catch (error) { notice(`Note was not saved: ${error.message}`, "error"); }
   }
   async function load() {
     try {
@@ -295,6 +346,9 @@
   q("#v2CaseForm")?.addEventListener("submit", createLiveCase);
   q("#v2ReportButton")?.addEventListener("click", () => { if (resultState?.id) window.open(`/v2/results/${resultState.id}/report.pdf`, "_blank", "noopener"); });
   q("#v2DraftButton")?.addEventListener("click", createDraft);
+  q("#v2VerifyIntegrityButton")?.addEventListener("click", verifyIntegrity);
+  q("#v2EvidenceBundleButton")?.addEventListener("click", () => { if (resultState?.id) window.open(`/v2/results/${resultState.id}/evidence-bundle.zip`, "_blank", "noopener"); });
+  q("#v2AnnotationForm")?.addEventListener("submit", addAnnotation);
   q("#closeV2Button")?.addEventListener("click", close);
   window.VaspTraceV2 = { load, render, get result() { return resultState; } };
 })();

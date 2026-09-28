@@ -9,23 +9,24 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/"><span class="brand-mark">VT</span><span><b>VASP TRACE</b><small>Evidence-first VASP attribution</small></span></a>
+    <a class="brand" href="/"><span class="brand-mark">VT</span><span><b>VASP TRACE</b><small>Investigation workbench</small></span></a>
+    <nav class="topnav" aria-label="Application navigation"><a href="#investigations">Investigations</a><a href="#intelligence">Intelligence</a><a href="#connections">Connections</a><a href="#reports">Reports</a></nav>
     <div class="topbar-meta"><span id="liveSources" class="source-state">Checking providers</span><span id="apiStatus" class="status neutral">Connecting</span></div>
   </header>
 
   <main class="application-shell">
-    <section class="command-heading">
-      <div><p class="eyebrow">LEA investigation workspace</p><h1>Trace funds. Verify the endpoint. Route the right request.</h1><p class="subtle">Confirmed transaction evidence, reviewable VASP attribution, and action drafts in one case record.</p></div>
-      <div class="heading-actions"><button id="importRecordedButton" class="button secondary">Import JSON package</button><button id="importCsvButton" class="button secondary">Import trace CSV</button><button id="importIntelligenceButton" class="button secondary">Import intelligence CSV</button><button id="reviewIntelligenceButton" class="button secondary">Review intelligence</button><button id="bridgeWorkflowButton" class="button secondary">Bridge evidence</button><button id="caseHistoryButton" class="button secondary">Case history</button><button id="newV2CaseButton" class="button primary">New v2 live trace</button><button id="v2DemoButton" class="button secondary">Load v2 evidence demo</button><button id="demoCaseButton" class="button secondary">Load guided demo</button><button id="newCaseButton" class="button primary">New investigation</button></div>
+    <section id="investigations" class="command-heading">
+      <div><p class="eyebrow">Investigations</p><h1>Investigation workspace</h1><p class="subtle">Open a case, trace disputed value, inspect evidence, and prepare a reviewed action package.</p></div>
+      <div class="heading-actions"><button id="newV2CaseButton" class="button primary">New Investigation</button><details class="utility-menu"><summary>Evidence tools</summary><div><button id="importRecordedButton" class="button secondary">Import evidence package</button><button id="importCsvButton" class="button secondary">Import trace CSV</button><button id="importIntelligenceButton" class="button secondary">Import intelligence</button><button id="reviewIntelligenceButton" class="button secondary">Review queue</button><button id="bridgeWorkflowButton" class="button secondary">Cross-chain evidence</button><button id="caseHistoryButton" class="button secondary">Case history</button><button id="v2DemoButton" class="button secondary">Load demonstration data</button></div></details><span hidden><button id="demoCaseButton">Legacy demo</button><button id="newCaseButton">Legacy investigation</button></span></div>
     </section>
 
-    <section class="capability-card card" aria-labelledby="capabilityTitle">
+    <details class="capability-card card" aria-labelledby="capabilityTitle">
       <div class="capability-head">
-        <div><p class="eyebrow">Chain capability matrix</p><h2 id="capabilityTitle">What this build can analyze</h2></div>
-        <p>Adapter maturity is shown per network so investigations do not overstate chain coverage.</p>
+        <div><p class="eyebrow">System status</p><h2 id="capabilityTitle">Chain coverage</h2></div>
+        <p>Open to inspect supported acquisition paths and capability limitations.</p>
       </div>
       <div id="capabilityMatrix" class="capability-matrix" aria-live="polite"><p class="empty">Loading chain capabilities…</p></div>
-    </section>
+    </details>
 
     <section class="command-layout">
       <aside class="case-rail card">
@@ -43,6 +44,7 @@
           </header>
           <div id="v2DataMode" class="data-mode synthetic">SYNTHETIC DEMO</div>
           <p id="v2Limitation" class="v2-limitation"></p>
+          <section id="v2Coverage" class="v2-coverage" aria-live="polite"></section>
           <section class="v2-summary-grid">
             <article><span>Disputed value</span><strong id="v2Disputed">—</strong><small>Transaction-seeded disputed lot</small></article>
             <article><span>Accounted to terminals</span><strong id="v2Accounted">—</strong><small>Reached a defined trace endpoint</small></article>
@@ -65,7 +67,21 @@
             <div class="v2-section-head"><div><p class="eyebrow">Defensible action centre</p><h3>Amount, challenge tests, and next evidence</h3></div><span class="type-badge">Evidence-to-action</span></div>
             <p class="subtle">The system proposes a local request amount only when endpoint evidence and the local routing profile pass their checks.</p>
             <div id="v2Actionability" class="v2-inference-grid"><p class="empty">Actionability assessment will appear with the result.</p></div>
-          </section>          <section class="v2-inference-panel">
+          </section>
+          <section class="v2-inference-panel">
+            <div class="v2-section-head"><div><p class="eyebrow">Evidence integrity</p><h3>Verify and export the result snapshot</h3></div><div class="case-actions"><button id="v2VerifyIntegrityButton" class="button secondary">Verify stored evidence</button><button id="v2EvidenceBundleButton" class="button secondary">Download evidence bundle</button></div></div>
+            <div id="v2Integrity" class="v2-inference-grid"><p class="empty">Integrity verification has not been run for this view.</p></div>
+          </section>
+          <section class="v2-inference-panel" id="connections">
+            <div class="v2-section-head"><div><p class="eyebrow">Related investigations</p><h3>Exact shared infrastructure</h3></div></div>
+            <div id="v2Connections" class="v2-inference-grid"><p class="empty">No cross-case links loaded.</p></div>
+          </section>
+          <section class="v2-inference-panel">
+            <div class="v2-section-head"><div><p class="eyebrow">Case activity</p><h3>Investigator notes</h3></div></div>
+            <form id="v2AnnotationForm" class="annotation-form"><select name="note_type"><option value="OBSERVATION">Observation</option><option value="HYPOTHESIS">Hypothesis</option><option value="FOLLOW_UP">Follow-up</option><option value="VERIFIED_FINDING">Verified finding</option><option value="LEGAL_NOTE">Legal note</option><option value="HANDOFF">Handoff</option></select><textarea name="body" rows="2" required placeholder="Record an investigator observation or follow-up."></textarea><button class="button secondary" value="default">Add note</button></form>
+            <div id="v2Annotations" class="v2-inference-grid"><p class="empty">No investigator notes have been recorded.</p></div>
+          </section>
+          <section class="v2-inference-panel">
             <div class="v2-section-head"><div><p class="eyebrow">Deposit infrastructure hypotheses</p><h3>Rule-based inference awaiting review</h3></div><span class="type-badge">Not an operational endpoint</span></div>
             <div id="v2Inferences" class="v2-inference-grid"></div>
           </section>
