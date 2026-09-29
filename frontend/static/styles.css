@@ -870,30 +870,30 @@ a:hover {
 
 .legend-dot {
   display: inline-block;
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   margin-right: 4px;
 }
 
-.legend-dot.suspect { background: var(--dash-critical); }
-.legend-dot.observed { background: var(--dash-warning); }
-.legend-dot.vasp { background: var(--dash-clean); }
-.legend-dot.frontier { background: var(--dash-text-muted); transform: rotate(45deg); border-radius: 1px; }
+.legend-dot.suspect { background: #e34b55; }
+.legend-dot.observed { background: #d99c38; }
+.legend-dot.vasp { background: #16a678; }
+.legend-dot.frontier { background: #72849a; transform: rotate(45deg); border-radius: 1px; }
 
 .trace-graph {
   height: 480px;
   width: 100%;
-  background: var(--dash-bg);
+  background: radial-gradient(circle at 50% 35%, #0d2945 0, transparent 48%), repeating-linear-gradient(0deg, transparent 0 27px, rgba(81, 121, 156, 0.08) 28px), #06111f;
   border-top: 1px solid var(--dash-border);
   border-bottom: 1px solid var(--dash-border);
 }
 
 .graph-caption {
-  padding: 6px 14px;
+  padding: 8px 14px;
   margin: 0;
   font-size: 10px;
-  color: var(--dash-text-muted);
+  color: #92a8c2;
 }
 
 /* ==========================================================================
