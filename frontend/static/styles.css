@@ -573,19 +573,195 @@ a:hover {
   background: var(--dash-card);
 }
 
-.empty-state {
-  min-height: 520px;
+/* ==========================================================================
+   Feature Bar — Always-visible quick-access strip (Req #9, #10, #11)
+   ========================================================================== */
+.feature-bar {
   display: grid;
-  place-content: center;
-  text-align: center;
-  color: var(--dash-text-secondary);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0 0 16px;
 }
 
-.empty-state h2 {
-  color: #ffffff;
-  font-size: 18px;
+.feature-bar-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--dash-card);
+  border: 1px solid var(--dash-border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  text-align: left;
+  color: var(--dash-text-primary);
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.feature-bar-btn:hover {
+  background: var(--dash-card-hover);
+  border-color: rgba(139, 92, 246, 0.4);
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.12);
+}
+
+.feature-bar-btn b {
+  display: block;
+  font-size: 12px;
   font-weight: 600;
-  margin: 10px 0 4px;
+  color: #ffffff;
+}
+
+.feature-bar-btn small {
+  display: block;
+  font-size: 10px;
+  color: var(--dash-text-muted);
+  margin-top: 1px;
+}
+
+.feature-bar-icon {
+  font-size: 18px;
+  flex: 0 0 auto;
+  width: 28px;
+  text-align: center;
+}
+
+.feature-bar-badge {
+  margin-left: auto;
+  flex: 0 0 auto;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dash-info);
+  background: var(--dash-info-bg);
+  border: 1px solid var(--dash-info-border);
+  border-radius: 999px;
+  padding: 2px 6px;
+}
+
+@media (max-width: 900px) {
+  .feature-bar {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .feature-bar {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==========================================================================
+   Enhanced Empty State — Feature Showcase (Req #8 and all others)
+   ========================================================================== */
+.empty-state {
+  min-height: 520px;
+  padding: 24px;
+  display: grid;
+  gap: 24px;
+  align-content: start;
+}
+
+.empty-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 20px 0;
+}
+
+.empty-hero h2 {
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 700;
+  margin: 8px 0 4px;
+}
+
+.empty-hero p {
+  color: var(--dash-text-secondary);
+  font-size: 13px;
+  margin: 0;
+  max-width: 440px;
+}
+
+.empty-cta-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 6px;
+}
+
+.feature-showcase {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.showcase-card {
+  border: 1px solid var(--dash-border);
+  border-radius: 8px;
+  background: var(--dash-card-secondary);
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: grid;
+  gap: 4px;
+}
+
+.showcase-card:hover {
+  background: var(--dash-card-hover);
+  border-color: rgba(139, 92, 246, 0.4);
+  box-shadow: 0 0 14px rgba(139, 92, 246, 0.1);
+}
+
+.showcase-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--dash-info-bg);
+  border: 1px solid var(--dash-info-border);
+  color: #a78bfa;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.showcase-card b {
+  font-size: 12px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.showcase-card p {
+  margin: 0;
+  font-size: 11px;
+  color: var(--dash-text-muted);
+  line-height: 1.4;
+}
+
+/* ==========================================================================
+   V2 Coverage Section Header
+   ========================================================================== */
+.v2-coverage-head {
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--dash-border);
+  margin-bottom: 6px;
+}
+
+.v2-coverage-head h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 1px 0 0;
+  color: #ffffff;
+}
+
+/* V2 Evidence Content panel */
+.v2-evidence-content {
+  padding-top: 10px;
+  min-height: 200px;
 }
 
 .empty-icon {
@@ -870,30 +1046,30 @@ a:hover {
 
 .legend-dot {
   display: inline-block;
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   margin-right: 4px;
 }
 
-.legend-dot.suspect { background: var(--dash-critical); }
-.legend-dot.observed { background: var(--dash-warning); }
-.legend-dot.vasp { background: var(--dash-clean); }
-.legend-dot.frontier { background: var(--dash-text-muted); transform: rotate(45deg); border-radius: 1px; }
+.legend-dot.suspect { background: #e34b55; }
+.legend-dot.observed { background: #d99c38; }
+.legend-dot.vasp { background: #16a678; }
+.legend-dot.frontier { background: #72849a; transform: rotate(45deg); border-radius: 1px; }
 
 .trace-graph {
   height: 480px;
   width: 100%;
-  background: var(--dash-bg);
+  background: radial-gradient(circle at 50% 35%, #0d2945 0, transparent 48%), repeating-linear-gradient(0deg, transparent 0 27px, rgba(81, 121, 156, 0.08) 28px), #06111f;
   border-top: 1px solid var(--dash-border);
   border-bottom: 1px solid var(--dash-border);
 }
 
 .graph-caption {
-  padding: 6px 14px;
+  padding: 8px 14px;
   margin: 0;
   font-size: 10px;
-  color: var(--dash-text-muted);
+  color: #92a8c2;
 }
 
 /* ==========================================================================
@@ -1293,6 +1469,157 @@ a:hover {
   border: 1px solid var(--dash-critical-border);
 }
 
+.claim-state.verified {
+  color: #34d399;
+  background: var(--dash-clean-bg);
+  border: 1px solid var(--dash-clean-border);
+}
+
+.claim-state.inferred {
+  color: #fbbf24;
+  background: var(--dash-warning-bg);
+  border: 1px solid var(--dash-warning-border);
+}
+
+.claim-state.pending {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.claim-state.reviewed {
+  color: #34d399;
+  background: var(--dash-clean-bg);
+  border: 1px solid var(--dash-clean-border);
+}
+
+.claim-state.rejected {
+  color: #f87171;
+  background: var(--dash-critical-bg);
+  border: 1px solid var(--dash-critical-border);
+}
+
+.claim-state.unreviewed {
+  color: var(--dash-text-muted);
+  background: rgba(113, 113, 122, 0.12);
+  border: 1px solid rgba(113, 113, 122, 0.25);
+}
+
+.v2-coverage-records {
+  display: grid;
+  gap: 6px;
+}
+
+.v2-coverage {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0;
+}
+
+.coverage-record {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--dash-border);
+  background: var(--dash-card-secondary);
+  font-size: 11px;
+}
+
+.coverage-record b {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  min-width: 120px;
+}
+
+.coverage-record span { color: var(--dash-text-secondary); }
+.coverage-record small { color: var(--dash-text-muted); display: block; }
+
+.coverage-record.confirmed {
+  border-color: var(--dash-clean-border);
+  background: var(--dash-clean-bg);
+}
+.coverage-record.confirmed b { color: #34d399; }
+
+.coverage-record.partial {
+  border-color: var(--dash-warning-border);
+  background: var(--dash-warning-bg);
+}
+.coverage-record.partial b { color: #fbbf24; }
+
+.coverage-record.recorded {
+  border-color: rgba(56, 189, 248, 0.3);
+  background: rgba(56, 189, 248, 0.08);
+}
+.coverage-record.recorded b { color: #38bdf8; }
+
+.coverage-record.synthetic {
+  border-color: var(--dash-warning-border);
+  background: var(--dash-warning-bg);
+}
+.coverage-record.synthetic b { color: #fbbf24; }
+
+/* Reason List (deposit inference detail) */
+.reason-list {
+  border-top: 1px solid var(--dash-border);
+  padding-top: 8px;
+  margin-top: 6px;
+  display: grid;
+  gap: 3px;
+}
+
+.reason-list p {
+  margin: 0;
+  font-size: 11px;
+  color: var(--dash-text-secondary);
+  line-height: 1.4;
+}
+
+/* Actionability cards & lists */
+.actionability-card {
+  width: 100%;
+}
+
+.actionability-list {
+  margin: 6px 0 0;
+  padding: 0 0 0 14px;
+  display: grid;
+  gap: 4px;
+}
+
+.actionability-list li {
+  font-size: 11px;
+  color: var(--dash-text-secondary);
+  line-height: 1.4;
+}
+
+.actionability-list li b {
+  color: var(--dash-text-primary);
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  margin-right: 4px;
+}
+
+.actionability-list li small {
+  display: block;
+  color: var(--dash-text-muted);
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+/* Wormhole-only bridge field (shown/hidden via JS) */
+.wormhole-only {
+  display: none;
+}
+.wormhole-active .wormhole-only {
+  display: grid;
+}
+
 .v2-candidate-card strong, .v2-inference-card strong {
   font-size: 14px;
   font-weight: 600;
@@ -1506,6 +1833,43 @@ input:focus, select:focus, textarea:focus {
   padding: 7px;
 }
 
+/* Intake Provenance Callout (case intake dialog) */
+.intake-provenance-note {
+  background: var(--dash-card-secondary);
+  border: 1px solid var(--dash-border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 11px;
+  color: var(--dash-text-secondary);
+  line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.provenance-tag {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 999px;
+  padding: 2px 7px;
+  margin-right: 5px;
+}
+
+.provenance-tag.investigator {
+  color: #a78bfa;
+  background: var(--dash-info-bg);
+  border: 1px solid var(--dash-info-border);
+}
+
+.provenance-tag.chain {
+  color: #34d399;
+  background: var(--dash-clean-bg);
+  border: 1px solid var(--dash-clean-border);
+}
+
 /* Notice banners */
 .notice {
   margin: 12px 0;
@@ -1521,6 +1885,12 @@ input:focus, select:focus, textarea:focus {
   background: var(--dash-critical-bg);
   border-color: var(--dash-critical-border);
   color: #fca5a5;
+}
+
+.notice.success {
+  background: var(--dash-clean-bg);
+  border-color: var(--dash-clean-border);
+  color: #6ee7b7;
 }
 
 .pre-trace {
