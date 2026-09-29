@@ -301,6 +301,20 @@ function bindEvents() {
   $("#zoomInButton").onclick = () => window.TraceGraph?.zoom(0.2);
   $("#zoomOutButton").onclick = () => window.TraceGraph?.zoom(-0.2);
   document.querySelectorAll(".tab").forEach(button => button.onclick = () => { state.activeTab = button.dataset.tab; renderEvidenceTab(); });
+
+  // Close dropdown menu when clicking anywhere outside or on any menu button
+  document.addEventListener("click", event => {
+    document.querySelectorAll("details.utility-menu[open]").forEach(details => {
+      if (!details.contains(event.target)) {
+        details.removeAttribute("open");
+      }
+    });
+  });
+  document.querySelectorAll("details.utility-menu button").forEach(button => {
+    button.addEventListener("click", () => {
+      button.closest("details.utility-menu")?.removeAttribute("open");
+    });
+  });
 }
 
 function capabilityTone(value) {

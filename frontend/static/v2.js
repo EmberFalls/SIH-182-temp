@@ -51,9 +51,22 @@
     q("#v2DataMode").className = `data-mode ${String(result.data_mode || "SYNTHETIC").toLowerCase()}`;
     q("#v2Limitation").textContent = (result.limitations || []).join(" ");
     const coverage = result.coverage || [];
-    q("#v2Coverage").innerHTML = coverage.length
+    const coverageRecords = coverage.length
       ? coverage.map(item => `<div class="coverage-record ${escapeHtml(String(item.coverage_status || "UNKNOWN").toLowerCase())}"><b>${escapeHtml(item.coverage_status.replaceAll("_", " "))}</b><span>${escapeHtml(item.provider)} · <code>${escapeHtml(short(item.subject))}</code> · ${item.pages_collected} page${item.pages_collected === 1 ? "" : "s"}</span>${item.reason_incomplete ? `<small>${escapeHtml(item.reason_incomplete)}</small>` : ""}</div>`).join("")
       : `<div class="coverage-record recorded"><b>${result.data_mode === "SYNTHETIC" ? "SYNTHETIC EVIDENCE" : "RECORDED EVIDENCE"}</b><span>No live-provider coverage claim is made for this result.</span></div>`;
+    const coverageContainer = q("#v2Coverage");
+    if (coverageContainer) {
+      // Preserve the static heading; only replace/add the records portion
+      const existingRecords = coverageContainer.querySelector(".v2-coverage-records");
+      if (existingRecords) {
+        existingRecords.innerHTML = coverageRecords;
+      } else {
+        const el = document.createElement("div");
+        el.className = "v2-coverage-records";
+        el.innerHTML = coverageRecords;
+        coverageContainer.appendChild(el);
+      }
+    }
     q("#v2Disputed").textContent = `${money(flow.seed_amount)} ${asset}`;
     q("#v2Accounted").textContent = `${money(flow.terminal_amount)} ${asset}`;
     q("#v2Unresolved").textContent = `${money(flow.unresolved_amount)} ${asset}`;
@@ -149,8 +162,7 @@
     try {
       render(await request("/demo/scenarios/v2-deposit-inference"));
     } catch (error) {
-      const notice = q("#notice");
-      if (notice) { notice.hidden = false; notice.className = "notice error"; notice.textContent = error.message; }
+      notice(error.message, "error");
     }
   }
 
@@ -168,8 +180,7 @@
       form.reset();
       render({ ...result, case: caseRecord });
     } catch (error) {
-      const notice = q("#notice");
-      if (notice) { notice.hidden = false; notice.className = "notice error"; notice.textContent = `Recorded package was not imported: ${error.message}`; }
+      notice(`Recorded package was not imported: ${error.message}`, "error");
     } finally {
       submit.disabled = false;
     }
@@ -188,8 +199,7 @@
       form.reset();
       render({ ...result, case: caseRecord });
     } catch (error) {
-      const notice = q("#notice");
-      if (notice) { notice.hidden = false; notice.className = "notice error"; notice.textContent = `Trace CSV was not imported: ${error.message}`; }
+      notice(`Trace CSV was not imported: ${error.message}`, "error");
     } finally {
       submit.disabled = false;
     }
@@ -205,18 +215,27 @@
       const outcome = await request("/v2/intelligence/import/assertions/csv", { body: JSON.stringify({ csv_text: values.csv_text }) });
       q("#intelligenceImportDialog").close();
       form.reset();
-      const notice = q("#notice");
-      if (notice) { notice.hidden = false; notice.className = outcome.rejected?.length ? "notice error" : "notice success"; notice.textContent = `Imported ${outcome.imported} intelligence assertion${outcome.imported === 1 ? "" : "s"}${outcome.rejected?.length ? `; ${outcome.rejected.length} row(s) need correction.` : "."}`; }
+      const msg = `Successfully imported ${outcome.imported} intelligence assertion${outcome.imported === 1 ? "" : "s"}${outcome.rejected?.length ? `; ${outcome.rejected.length} row(s) had invalid fields.` : ". Open 'Review queue' in Evidence tools to inspect or approve."}`;
+      notice(msg, outcome.rejected?.length ? "error" : "success");
     } catch (error) {
-      const notice = q("#notice");
-      if (notice) { notice.hidden = false; notice.className = "notice error"; notice.textContent = `Intelligence CSV was not imported: ${error.message}`; }
+      notice(`Intelligence CSV was not imported: ${error.message}`, "error");
     } finally {
       submit.disabled = false;
     }
   }
   function notice(text, type = "success") {
-    const target = q("#notice");
-    if (target) { target.hidden = false; target.className = `notice ${type}`; target.textContent = text; }
+    const targets = [q("#globalNotice"), q("#notice")].filter(Boolean);
+    targets.forEach(target => {
+      target.hidden = false;
+      target.className = `notice ${type === "error" ? "error" : type === "success" ? "success" : ""}`;
+      target.textContent = text;
+    });
+    // Auto-dismiss success notices after 6 seconds
+    if (type !== "error") {
+      setTimeout(() => {
+        targets.forEach(target => { target.hidden = true; target.textContent = ""; });
+      }, 6000);
+    }
   }
 
   async function lookupIntelligence(event) {
@@ -308,8 +327,7 @@
       event.target.reset();
       render({ ...result, case: caseRecord });
     } catch (error) {
-      const notice = q("#notice");
-      if (notice) { notice.hidden = false; notice.className = "notice error"; notice.textContent = error.message; }
+      notice(error.message, "error");
     } finally {
       submit.disabled = false;
     }
@@ -337,7 +355,7 @@
   q("#bridgeExtractForm")?.addEventListener("submit", extractBridgeEvent);
   q("#bridgeResolveForm")?.addEventListener("submit", resolveBridgeEvents);
   q("#importCsvButton")?.addEventListener("click", () => q("#csvImportDialog").showModal());
-  q("#intelligenceImportButton")?.addEventListener("click", () => q("#intelligenceImportDialog").showModal());
+  q("#importIntelligenceButton")?.addEventListener("click", () => q("#intelligenceImportDialog").showModal());
   q("#recordedImportForm")?.addEventListener("submit", importRecordedPackage);
   q("#csvImportForm")?.addEventListener("submit", importRecordedCsv);
   q("#intelligenceImportForm")?.addEventListener("submit", importIntelligenceCsv);
@@ -350,5 +368,12 @@
   q("#v2EvidenceBundleButton")?.addEventListener("click", () => { if (resultState?.id) window.open(`/v2/results/${resultState.id}/evidence-bundle.zip`, "_blank", "noopener"); });
   q("#v2AnnotationForm")?.addEventListener("submit", addAnnotation);
   q("#closeV2Button")?.addEventListener("click", close);
+
+  // Wormhole protocol field visibility toggle
+  q("[name='mode']")?.addEventListener("change", event => {
+    const form = q("#bridgeExtractForm");
+    if (form) form.classList.toggle("wormhole-active", event.target.value === "wormhole");
+  });
+
   window.VaspTraceV2 = { load, render, get result() { return resultState; } };
 })();
