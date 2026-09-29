@@ -3,152 +3,797 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="VASP Trace evidence-first cryptocurrency investigation workbench">
-  <title>VASP Trace | Investigation Workbench</title>
+  <meta name="description" content="VASP Trace — Evidence-first cryptocurrency investigation workbench, deterministic multi-hop attribution, tamper-evident manifest generation, and defensible action routing.">
+  <title>VASP Trace — Forensic Cryptocurrency Investigation Platform</title>
+
+  <!-- Google Fonts: IBM Plex Sans, IBM Plex Mono, Geist Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600;700&family=Geist:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/static/landing.css">
   <link rel="stylesheet" href="/static/styles.css">
 </head>
-<body>
-  <header class="topbar">
-    <a class="brand" href="/"><span class="brand-mark">VT</span><span><b>VASP TRACE</b><small>Investigation workbench</small></span></a>
-    <nav class="topnav" aria-label="Application navigation"><a href="#investigations">Investigations</a><a href="#intelligence">Intelligence</a><a href="#connections">Connections</a><a href="#reports">Reports</a></nav>
-    <div class="topbar-meta"><span id="liveSources" class="source-state">Checking providers</span><span id="apiStatus" class="status neutral">Connecting</span></div>
-  </header>
+<body style="background-color: #18181b;">
 
-  <main class="application-shell">
-    <section id="investigations" class="command-heading">
-      <div><p class="eyebrow">Investigations</p><h1>Investigation workspace</h1><p class="subtle">Open a case, trace disputed value, inspect evidence, and prepare a reviewed action package.</p></div>
-      <div class="heading-actions"><button id="newV2CaseButton" class="button primary">New Investigation</button><details class="utility-menu"><summary>Evidence tools</summary><div><button id="importRecordedButton" class="button secondary">Import evidence package</button><button id="importCsvButton" class="button secondary">Import trace CSV</button><button id="importIntelligenceButton" class="button secondary">Import intelligence</button><button id="reviewIntelligenceButton" class="button secondary">Review queue</button><button id="bridgeWorkflowButton" class="button secondary">Cross-chain evidence</button><button id="caseHistoryButton" class="button secondary">Case history</button><button id="v2DemoButton" class="button secondary">Load demonstration data</button></div></details><span hidden><button id="demoCaseButton">Legacy demo</button><button id="newCaseButton">Legacy investigation</button></span></div>
+  <!-- ==========================================================================
+       SECTION: Zeabur-Inspired Dark SaaS Landing Page
+       ========================================================================== -->
+  <div id="landingView" class="landing-wrapper">
+
+    <!-- Sticky Navbar -->
+    <header class="landing-header">
+      <div class="landing-brand" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
+        <span class="landing-brand-mark">VT</span>
+        <span class="landing-brand-name">vasp <span>trace</span></span>
+      </div>
+
+      <nav class="landing-nav" aria-label="Landing Navigation">
+        <a href="#hero">Platform</a>
+        <a href="#features">Features</a>
+        <a href="#sandbox">Forensics Sandbox</a>
+        <a href="#bento">Architecture</a>
+        <a href="#capabilities">Chain Coverage</a>
+        <a href="https://github.com/developmentwithparth1311/SIH-182-temp" target="_blank" rel="noopener">Documentation</a>
+      </nav>
+
+      <div class="landing-header-actions">
+        <button class="btn-landing-secondary" onclick="window.launchWorkbench()">
+          Open Workspace
+        </button>
+        <button class="btn-landing-primary" onclick="window.launchWorkbench()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M5 12h14M12 5l7 7-7 7" />
+          </svg>
+          Launch Workbench
+        </button>
+      </div>
+    </header>
+
+    <!-- Hero Section with 3D Binary Wave Canvas & Scrambler -->
+    <section id="hero" class="landing-hero">
+      <canvas id="binaryWaveCanvas" class="landing-canvas"></canvas>
+      <div class="landing-hero-vignette"></div>
+      <div class="landing-hero-fade"></div>
+
+      <div class="landing-hero-content">
+        <!-- News Pill -->
+        <a href="#features" class="landing-news-pill">
+          <span class="landing-pill-tag">New</span>
+          <span class="landing-pill-text">Announcing VASP Trace v2.0: Multi-Hop Attribution, Proof Manifests & Defensible Routing</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a1a1aa" stroke-width="2.2">
+            <path d="M5 12h14M12 5l7 7-7 7" />
+          </svg>
+        </a>
+
+        <!-- Main Headline -->
+        <h1 class="landing-headline-main">
+          Evidence-First Crypto Forensics
+        </h1>
+
+        <!-- Scrambler dynamic headline -->
+        <div class="landing-headline-sub">
+          <span class="landing-scramble-lead">handling all your </span>
+          <span id="scrambleWord" class="landing-scramble-word">disputed flows</span>
+        </div>
+
+        <p class="landing-hero-desc">
+          Automated multi-hop trace attribution for USDT across TRON and EVM chains. Bounded downstream flow allocation, reviewed VASP label registries, and court-admissible SAHYOG evidence manifests.
+        </p>
+
+        <!-- Zeabur-style Agent Input Box -->
+        <form id="agentPromptForm" class="landing-agent-box">
+          <span class="landing-agent-badge">Ask Agent</span>
+          <input
+            id="agentPromptInput"
+            class="landing-agent-input"
+            type="text"
+            placeholder="Paste suspect wallet (0x... or T...) or transaction hash to trace..."
+            spellcheck="false"
+          />
+          <button id="agentUploadBtn" type="button" class="landing-agent-btn-upload" title="Import trace JSON/CSV package">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="17 8 12 3 7 8" />
+              <line x1="12" y1="3" x2="12" y2="15" />
+            </svg>
+          </button>
+          <button type="submit" class="landing-agent-btn-submit" title="Run Trace">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
+              <line x1="12" y1="19" x2="12" y2="5" />
+              <polyline points="5 12 12 5 19 12" />
+            </svg>
+          </button>
+        </form>
+      </div>
     </section>
 
-    <details class="capability-card card" aria-labelledby="capabilityTitle">
-      <div class="capability-head">
-        <div><p class="eyebrow">System status</p><h2 id="capabilityTitle">Chain coverage</h2></div>
-        <p>Open to inspect supported acquisition paths and capability limitations.</p>
+    <!-- Protocol Badges Infinite Marquee -->
+    <div id="features" class="landing-marquee-wrapper">
+      <div class="landing-marquee-gradient-left"></div>
+      <div class="landing-marquee-gradient-right"></div>
+      <div class="marquee-container">
+        <!-- Sequence of badges repeated for seamless infinite loop -->
+        <div class="marquee-badge"><div class="marquee-dot" style="background: #38bdf8;"></div><span class="marquee-label">TRC-20 & ERC-20 Public Ingestion</span></div>
+        <div class="marquee-badge"><div class="marquee-dot" style="background: #34d399;"></div><span class="marquee-label">Reviewed VASP Label Registry</span></div>
+        <div class="marquee-badge"><div class="marquee-dot" style="background: #c084fc;"></div><span class="marquee-label">Bounded Multi-Hop USDT Tracing</span></div>
+        <div class="marquee-badge"><div class="marquee-dot" style="background: #fbbf24;"></div><span class="marquee-label">Tamper-Evident SHA-256 Manifest</span></div>
+        <div class="marquee-badge"><div class="marquee-dot" style="background: #a855f7;"></div><span class="marquee-label">Defensible SAHYOG Requisition Routing</span></div>
+        <div class="marquee-badge"><div class="marquee-dot" style="background: #34d399;"></div><span class="marquee-label">Cross-Chain Exact-Message Proof Engine</span></div>
+        <div class="marquee-badge"><div class="marquee-dot" style="background: #f87171;"></div><span class="marquee-label">Zero Unverified Attribution Guarantees</span></div>
+        <div class="marquee-badge"><div class="marquee-dot" style="background: #38bdf8;"></div><span class="marquee-label">Court-Admissible PDF & JSON Audit Bundles</span></div>
+
+        <!-- Repeated set -->
+        <div class="marquee-badge"><div class="marquee-dot" style="background: #38bdf8;"></div><span class="marquee-label">TRC-20 & ERC-20 Public Ingestion</span></div>
+        <div class="marquee-badge"><div class="marquee-dot" style="background: #34d399;"></div><span class="marquee-label">Reviewed VASP Label Registry</span></div>
+        <div class="marquee-badge"><div class="marquee-dot" style="background: #c084fc;"></div><span class="marquee-label">Bounded Multi-Hop USDT Tracing</span></div>
+        <div class="marquee-badge"><div class="marquee-dot" style="background: #fbbf24;"></div><span class="marquee-label">Tamper-Evident SHA-256 Manifest</span></div>
+        <div class="marquee-badge"><div class="marquee-dot" style="background: #a855f7;"></div><span class="marquee-label">Defensible SAHYOG Requisition Routing</span></div>
+        <div class="marquee-badge"><div class="marquee-dot" style="background: #34d399;"></div><span class="marquee-label">Cross-Chain Exact-Message Proof Engine</span></div>
+        <div class="marquee-badge"><div class="marquee-dot" style="background: #f87171;"></div><span class="marquee-label">Zero Unverified Attribution Guarantees</span></div>
+        <div class="marquee-badge"><div class="marquee-dot" style="background: #38bdf8;"></div><span class="marquee-label">Court-Admissible PDF & JSON Audit Bundles</span></div>
       </div>
-      <div id="capabilityMatrix" class="capability-matrix" aria-live="polite"><p class="empty">Loading chain capabilities…</p></div>
-    </details>
+    </div>
 
-    <section class="command-layout">
-      <aside class="case-rail card">
-        <div class="rail-head"><div><p class="eyebrow">Case command centre</p><h2>Investigations</h2></div><button id="refreshCases" class="icon-button" title="Refresh cases" aria-label="Refresh cases">↻</button></div>
-        <div id="caseList" class="case-list"><p class="empty">Loading investigations…</p></div>
-      </aside>
+    <!-- Interactive Simulation Sandbox -->
+    <section id="sandbox" class="landing-sandbox-section">
+      <div class="landing-sandbox-container">
+        <div>
+          <div class="landing-section-eyebrow">LIVE FORENSIC DEMONSTRATION</div>
+          <h2 class="landing-section-title">Interactive Trace & Attribution Sandbox</h2>
+          <p class="landing-section-sub">
+            Select an investigation scenario to inspect real-time flow allocation, provider provenance checks, and autonomous defensible action readiness.
+          </p>
+        </div>
 
-      <section class="workbench card">
-        <div id="emptyState" class="empty-state"><div class="empty-icon">⌘</div><h2>Open an investigation</h2><p>Choose a case from the command centre or create a new wallet investigation.</p></div>
+        <div id="sandboxTabs" class="sandbox-tabs" style="margin-top: 36px;"></div>
 
-        <section id="v2Workbench" hidden aria-live="polite">
-          <header class="v2-header">
-            <div><p class="eyebrow">Investigation result · v2</p><h2 id="v2CaseTitle">Evidence-first attribution result</h2><p id="v2CaseMeta" class="subtle"></p></div>
-            <div class="case-actions"><button id="v2ReportButton" class="button secondary">Download v2 report</button><button id="v2DraftButton" class="button primary">Create local request draft</button><button id="closeV2Button" class="button secondary">Return to investigations</button></div>
-          </header>
-          <div id="v2DataMode" class="data-mode synthetic">SYNTHETIC DEMO</div>
-          <p id="v2Limitation" class="v2-limitation"></p>
-          <section id="v2Coverage" class="v2-coverage" aria-live="polite"></section>
-          <section class="v2-summary-grid">
-            <article><span>Disputed value</span><strong id="v2Disputed">—</strong><small>Transaction-seeded disputed lot</small></article>
-            <article><span>Accounted to terminals</span><strong id="v2Accounted">—</strong><small>Reached a defined trace endpoint</small></article>
-            <article><span>Retained / unresolved</span><strong id="v2Unresolved">—</strong><small id="v2Retained">—</small></article>
-            <article><span>Actionable endpoints</span><strong id="v2EndpointCount">—</strong><small id="v2EndpointSummary">—</small></article>
-          </section>
-          <section class="v2-layout">
-            <div class="v2-main-panel">
-              <div class="v2-section-head"><div><p class="eyebrow">Actionable endpoints</p><h3>Where the disputed flow reached</h3></div><span class="type-badge">Evidence before routing</span></div>
-              <div id="v2Candidates" class="v2-candidate-grid"></div>
-              <div class="v2-section-head compact"><div><p class="eyebrow">Disputed-flow path</p><h3>Case-attributed transfers</h3></div></div>
-              <div id="v2Transfers" class="v2-transfer-list"></div>
+        <div class="sandbox-panel">
+          <div id="sandboxMetrics" class="sandbox-metrics-grid"></div>
+          <div id="sandboxMeters" class="sandbox-meters-grid"></div>
+          <div id="sandboxNote" class="sandbox-note"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bento Grid Architecture & Capabilities -->
+    <section id="bento" class="landing-bento-section">
+      <div class="landing-bento-container">
+        <div>
+          <div class="landing-section-eyebrow">CORE ARCHITECTURE</div>
+          <h2 class="landing-section-title">Built for Courtroom-Grade Forensics</h2>
+          <p class="landing-section-sub">
+            Every heuristic is explicitly tested against strict evidence rules. No unreviewed labels, no double-counted fund amounts, and zero unverified assertions.
+          </p>
+        </div>
+
+        <div class="landing-bento-grid">
+          <!-- Card 1 (Span 2) -->
+          <div class="bento-card span-2">
+            <div class="bento-card-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
+              </svg>
             </div>
-            <aside class="v2-evidence-panel">
-              <div class="inspector-head"><div><p class="eyebrow">Evidence drawer</p><h3>Why this claim?</h3></div><span id="v2EvidenceType" class="type-badge">None</span></div>
-              <div id="v2Evidence" class="v2-evidence-content"><p class="empty">Select an endpoint or deposit inference to inspect its evidence.</p></div>
-            </aside>
-          </section>
-          <section class="v2-inference-panel" id="v2ActionabilityPanel">
-            <div class="v2-section-head"><div><p class="eyebrow">Defensible action centre</p><h3>Amount, challenge tests, and next evidence</h3></div><span class="type-badge">Evidence-to-action</span></div>
-            <p class="subtle">The system proposes a local request amount only when endpoint evidence and the local routing profile pass their checks.</p>
-            <div id="v2Actionability" class="v2-inference-grid"><p class="empty">Actionability assessment will appear with the result.</p></div>
-          </section>
-          <section class="v2-inference-panel">
-            <div class="v2-section-head"><div><p class="eyebrow">Evidence integrity</p><h3>Verify and export the result snapshot</h3></div><div class="case-actions"><button id="v2VerifyIntegrityButton" class="button secondary">Verify stored evidence</button><button id="v2EvidenceBundleButton" class="button secondary">Download evidence bundle</button></div></div>
-            <div id="v2Integrity" class="v2-inference-grid"><p class="empty">Integrity verification has not been run for this view.</p></div>
-          </section>
-          <section class="v2-inference-panel" id="connections">
-            <div class="v2-section-head"><div><p class="eyebrow">Related investigations</p><h3>Exact shared infrastructure</h3></div></div>
-            <div id="v2Connections" class="v2-inference-grid"><p class="empty">No cross-case links loaded.</p></div>
-          </section>
-          <section class="v2-inference-panel">
-            <div class="v2-section-head"><div><p class="eyebrow">Case activity</p><h3>Investigator notes</h3></div></div>
-            <form id="v2AnnotationForm" class="annotation-form"><select name="note_type"><option value="OBSERVATION">Observation</option><option value="HYPOTHESIS">Hypothesis</option><option value="FOLLOW_UP">Follow-up</option><option value="VERIFIED_FINDING">Verified finding</option><option value="LEGAL_NOTE">Legal note</option><option value="HANDOFF">Handoff</option></select><textarea name="body" rows="2" required placeholder="Record an investigator observation or follow-up."></textarea><button class="button secondary" value="default">Add note</button></form>
-            <div id="v2Annotations" class="v2-inference-grid"><p class="empty">No investigator notes have been recorded.</p></div>
-          </section>
-          <section class="v2-inference-panel">
-            <div class="v2-section-head"><div><p class="eyebrow">Deposit infrastructure hypotheses</p><h3>Rule-based inference awaiting review</h3></div><span class="type-badge">Not an operational endpoint</span></div>
-            <div id="v2Inferences" class="v2-inference-grid"></div>
-          </section>
-        </section>
-        <div id="caseView" hidden>
-          <header class="case-header">
-            <div><p id="caseMeta" class="eyebrow"></p><h2 id="caseTitle"></h2><p id="caseWallet" class="mono wallet"></p></div>
-            <div class="case-actions"><label class="compact-field">Trace depth<select id="traceDepth"><option value="1">1 hop</option><option value="2">2 hops</option><option value="3" selected>3 hops</option><option value="4">4 hops</option><option value="5">5 hops</option></select></label><button id="traceButton" class="button primary">Run confirmed trace</button><button id="reviewButton" class="button secondary">Mark under review</button></div>
-          </header>
+            <h3 class="bento-card-title">Deterministic Disputed-Fund Allocation</h3>
+            <p class="bento-card-desc">
+              Conservative mathematical allocation bounded by the initial incident timestamp and disputed amount. Downstream transactions never exceed case-attributed funds, eliminating inflated double-counting across complex laundering clusters.
+            </p>
+            <div class="bento-code-preview">
+              <code>// Bounded Allocation Invariant<br>allocated_amount = min(outflow_amount, remaining_disputed_lot)<br>retention_ratio = (unresolved_amount / total_disputed) * 100%</code>
+            </div>
+            <div class="bento-tags">
+              <span class="bento-tag">PROPORTIONAL ROUTING</span>
+              <span class="bento-tag">FIFO ALLOCATION</span>
+              <span class="bento-tag">TIMESTAMPMATCH</span>
+            </div>
+          </div>
 
-          <div id="notice" class="notice" hidden></div>
-          <div id="preTrace" class="pre-trace"><span class="pre-trace-icon">◎</span><div><strong>Evidence-first trace is ready</strong><p>Runs retrieve confirmed transfers, preserve provider provenance, and show any coverage gaps.</p></div></div>
+          <!-- Card 2 -->
+          <div class="bento-card">
+            <div class="bento-card-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+            </div>
+            <h3 class="bento-card-title">Defensible Action Centre</h3>
+            <p class="bento-card-desc">
+              Bounds proposed legal requisition amounts, challenges weak evidence, and checks local VASP operational routing readiness before drafting Section 91 CrPC / SAHYOG requests.
+            </p>
+            <div class="bento-tags">
+              <span class="bento-tag">91 CRPC DRAFTS</span>
+              <span class="bento-tag">ROUTING READINESS</span>
+              <span class="bento-tag">CHALLENGE TESTS</span>
+            </div>
+          </div>
 
-          <div id="resultView" hidden>
-            <section class="summary-grid">
-              <article><span>Trace status</span><strong id="traceStatus">—</strong><small id="traceRun">Awaiting trace</small></article>
-              <article><span>Case flow allocated</span><strong id="attributedValue">—</strong><small id="flowMethod">Conservative allocation</small></article>
-              <article><span>Supported VASPs</span><strong id="candidateCount">—</strong><small id="nearestHop">No endpoint selected</small></article>
-              <article><span>Evidence coverage</span><strong id="coverageValue">—</strong><small id="coverageDetail">Provider retrieval</small></article>
-            </section>
+          <!-- Card 3 -->
+          <div class="bento-card">
+            <div class="bento-card-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="16 18 22 12 16 6" />
+                <polyline points="8 6 2 12 8 18" />
+              </svg>
+            </div>
+            <h3 class="bento-card-title">Tamper-Evident SHA-256 Manifests</h3>
+            <p class="bento-card-desc">
+              Immutable snapshots with deterministic canonical JSON serialization and SHA-256 hash receipts. Verifies forensic integrity from initial intake to final PDF export.
+            </p>
+            <div class="bento-tags">
+              <span class="bento-tag">CANONICAL SHA-256</span>
+              <span class="bento-tag">IMMUTABLE SNAPSHOT</span>
+              <span class="bento-tag">AUDIT LOG</span>
+            </div>
+          </div>
 
-            <section class="investigation-layout">
-              <aside class="trace-sidebar">
-                <div class="side-section"><div class="section-title"><span>Trace scope</span></div><dl id="scopeList" class="definition-list"></dl></div>
-                <div class="side-section"><div class="section-title"><span>Nearest supported VASPs</span><span id="candidateBadge" class="count-badge">0</span></div><div id="candidateList" class="candidate-list"></div></div>
-                <div class="side-section"><div class="section-title"><span>Path controls</span></div><button id="resetGraphButton" class="button secondary full">Show full trace</button><p class="microcopy">Select a VASP to isolate its shortest supporting path.</p></div>
-              </aside>
+          <!-- Card 4 -->
+          <div class="bento-card">
+            <div class="bento-card-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+                <line x1="4" y1="22" x2="4" y2="15" />
+              </svg>
+            </div>
+            <h3 class="bento-card-title">Reviewed VASP Label Registry</h3>
+            <p class="bento-card-desc">
+              Strict multi-tier provenance tracking. Unverified, expired, or unsourced labels are never converted into operational endpoints, preventing false-positive legal requisitions.
+            </p>
+            <div class="bento-tags">
+              <span class="bento-tag">TRUST TIERS</span>
+              <span class="bento-tag">REVIEWER WORKFLOW</span>
+              <span class="bento-tag">OFAC SDN QUEUE</span>
+            </div>
+          </div>
 
-              <section class="graph-panel">
-                <div class="graph-head"><div><p class="eyebrow">Confirmed transaction graph</p><h3>Funds-of-interest view</h3></div><div class="graph-tools"><button id="zoomOutButton" class="icon-button" title="Zoom out">−</button><button id="zoomInButton" class="icon-button" title="Zoom in">+</button><button id="fitGraphButton" class="button secondary small">Fit graph</button></div></div>
-                <div class="graph-legend"><span><i class="legend-dot suspect"></i>Suspect</span><span><i class="legend-dot observed"></i>Intermediary</span><span><i class="legend-dot vasp"></i>Reviewed VASP</span><span><i class="legend-dot frontier"></i>Evidence gap</span></div>
-                <div id="traceGraph" class="trace-graph" aria-label="Interactive transaction graph"></div>
-                <p class="graph-caption">Edge width represents the case-attributed amount. Select a node or edge to inspect the underlying evidence.</p>
-              </section>
-
-              <aside class="inspector-panel">
-                <div class="inspector-head"><div><p class="eyebrow">Evidence inspector</p><h3>Selection details</h3></div><span id="inspectorType" class="type-badge">None</span></div>
-                <div id="inspectorContent" class="inspector-content"><div class="inspector-empty"><span>⌁</span><p>Select a wallet, transfer, VASP, or evidence gap in the graph.</p></div></div>
-              </aside>
-            </section>
-
-            <section class="evidence-rail card-inset">
-              <div class="tab-bar" role="tablist"><button class="tab active" data-tab="transactions">Transactions</button><button class="tab" data-tab="risks">Risk patterns</button><button class="tab" data-tab="coverage">Coverage gaps</button><button class="tab" data-tab="crosscase">Cross-case</button></div>
-              <div id="evidenceTabContent" class="tab-content"></div>
-            </section>
-
-            <section class="action-centre card-inset">
-              <div><p class="eyebrow">Action and evidence centre</p><h3>Review before routing</h3><p class="subtle">A request remains a local draft until an investigator and legal reviewer approve it.</p></div>
-              <div id="actionChecklist" class="action-checklist"></div>
-              <div class="action-buttons"><button id="challengeButton" class="button secondary" disabled>Challenge top evidence</button><button id="verifyButton" class="button secondary" disabled>Verify trace receipt</button><button id="reportButton" class="button secondary" disabled>Download report</button><button id="draftButton" class="button primary" disabled>Create SAHYOG draft</button></div>
-            </section>
+          <!-- Card 5 -->
+          <div class="bento-card">
+            <div class="bento-card-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="6" cy="6" r="3" />
+                <circle cx="18" cy="6" r="3" />
+                <circle cx="12" cy="18" r="3" />
+                <line x1="8.59" y1="7.49" x2="15.42" y2="16.51" />
+                <line x1="15.41" y1="7.49" x2="8.59" y2="16.51" />
+              </svg>
+            </div>
+            <h3 class="bento-card-title">Interactive Cytoscape Flow Graph</h3>
+            <p class="bento-card-desc">
+              Visualizes suspect wallets, peel chains, intermediary hops, and custodial endpoints with edge-width proportional to case-attributed value and explicit frontier coverage gaps.
+            </p>
+            <div class="bento-tags">
+              <span class="bento-tag">SHORTEST PATH</span>
+              <span class="bento-tag">COVERAGE GAPS</span>
+              <span class="bento-tag">DRAWER INSPECTOR</span>
+            </div>
           </div>
         </div>
-      </section>
+      </div>
     </section>
-  </main>
 
-  <dialog id="caseDialog"><form id="caseForm" method="dialog"><div class="dialog-head"><div><p class="eyebrow">New investigation</p><h2>Case intake</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div><label>Case title<input name="title" required placeholder="USDT fraud investigation"></label><label>Suspect wallet<input name="suspect_wallet" required placeholder="T... or 0x..."></label><div class="form-grid"><label>Chain<select name="chain"><option value="TRON">TRON</option><option value="ETHEREUM">Ethereum</option><option value="BNB_CHAIN">BNB Chain</option><option value="POLYGON">Polygon</option></select></label><label>Asset<input name="token_symbol" value="USDT" required></label></div><div class="form-grid"><label>Disputed amount<input name="disputed_amount" type="number" min="0" step="0.000001" placeholder="Optional"></label><label>FIR number<input name="fir_number" placeholder="Optional"></label></div><label>Investigation note<textarea name="notes" rows="3" placeholder="Optional context"></textarea></label><div class="dialog-actions"><button value="cancel" class="button secondary">Cancel</button><button class="button primary" value="default">Create investigation</button></div></form></dialog>
+    <!-- Call to Action Banner -->
+    <section id="cta" class="landing-cta-section">
+      <div class="landing-cta-card">
+        <h2 class="landing-cta-title">Start Your Investigation Workspace</h2>
+        <p class="landing-cta-desc">
+          Ready to trace on-chain disputed assets with tamper-evident cryptographic provenance, reviewed exchange attribution, and defensible action routing?
+        </p>
+        <div class="landing-cta-actions">
+          <button class="btn-landing-primary" style="padding: 10px 24px; font-size: 0.95rem;" onclick="window.launchWorkbench()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+            Launch Investigation Workbench
+          </button>
+          <button class="btn-landing-secondary" style="padding: 10px 22px; font-size: 0.95rem;" onclick="window.launchWorkbench(); document.getElementById('v2DemoButton').click();">
+            Load Demonstration Case
+          </button>
+        </div>
+      </div>
+    </section>
 
-  <dialog id="recordedImportDialog"><form id="recordedImportForm" method="dialog"><div class="dialog-head"><div><p class="eyebrow">Recorded evidence replay</p><h2>Import a trace package</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div><p class="subtle">Paste a JSON package with <code>case</code> and <code>trace</code>. The case data mode must be RECORDED_REAL or SYNTHETIC. No provider request is made.</p><label>Trace package JSON<textarea name="package_json" rows="14" required spellcheck="false" placeholder='{"case": {…}, "trace": {"recorded_transfers": […]}}'></textarea></label><div class="dialog-actions"><button value="cancel" class="button secondary">Cancel</button><button class="button primary" value="default">Import and replay</button></div></form></dialog>
-  <dialog id="csvImportDialog"><form id="csvImportForm" method="dialog"><div class="dialog-head"><div><p class="eyebrow">Recorded evidence replay</p><h2>Import trace CSV</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div><p class="subtle">Paste the case JSON and its transfer CSV. This runs only on the evidence you supply and preserves the import as recorded evidence.</p><label>Case JSON<textarea name="case_json" rows="8" required spellcheck="false" placeholder='{"title":"Case", "context":{"seed_type":"transaction", "chain":"ETHEREUM", …}}'></textarea></label><label>Transfer CSV<textarea name="transfers_csv" rows="8" required spellcheck="false" placeholder="id,transaction_id,source_address,destination_address,raw_amount,normalized_amount,timestamp,raw_evidence_id&#10;…"></textarea></label><div class="dialog-actions"><button value="cancel" class="button secondary">Cancel</button><button class="button primary" value="default">Import and replay</button></div></form></dialog>
-  <dialog id="intelligenceImportDialog"><form id="intelligenceImportForm" method="dialog"><div class="dialog-head"><div><p class="eyebrow">Attribution evidence</p><h2>Import intelligence CSV</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div><p class="subtle">Import source-backed address assertions for review. Imported assertions begin unreviewed unless a reviewer state is explicitly present in the CSV.</p><label>Entity assertion CSV<textarea name="csv_text" rows="13" required spellcheck="false" placeholder="entity_name,entity_type,address,chain,role,assertion_type,source_name,source_type,trust_tier,retrieved_at&#10;…"></textarea></label><div class="dialog-actions"><button value="cancel" class="button secondary">Cancel</button><button class="button primary" value="default">Import intelligence</button></div></form></dialog>  <dialog id="intelligenceReviewDialog"><div class="dialog-head"><div><p class="eyebrow">Attribution evidence</p><h2>Review imported assertions</h2></div><button class="icon-button" value="cancel" onclick="this.closest('dialog').close()" aria-label="Close">×</button></div><form id="intelligenceLookupForm"><div class="form-grid"><label>Address<input name="address" required placeholder="0x… or T…"></label><label>Chain<select name="chain"><option value="ETHEREUM">Ethereum</option><option value="TRON">TRON</option><option value="BNB_CHAIN">BNB Chain</option><option value="POLYGON">Polygon</option></select></label></div><div class="dialog-actions"><button class="button primary">Find assertions</button></div></form><div id="intelligenceReviewResults" class="v2-inference-grid"><p class="empty">Search an imported address to review its source and assertion state.</p></div></dialog>
-  <dialog id="bridgeWorkflowDialog"><div class="dialog-head"><div><p class="eyebrow">Cross-chain evidence</p><h2>Bridge-event workflow</h2></div><button class="icon-button" value="cancel" onclick="this.closest('dialog').close()" aria-label="Close">×</button></div><p class="subtle">Use retained evidence records. The workflow never links transfers by amount or timing alone.</p><form id="bridgeExtractForm"><label>Protocol<select name="mode"><option value="normal">Normalized bridge event</option><option value="wormhole">Wormhole EVM receipt log</option></select></label><label>Raw evidence ID<input name="raw_evidence_id" required placeholder="EVID-…"></label><label>Canonical transfer JSON<textarea name="transfer_json" rows="5" required spellcheck="false" placeholder='{"id":"…","transaction_id":"…",…}'></textarea></label><div class="form-grid"><label>Protocol / Wormhole chain ID<input name="protocol" value="WORMHOLE" required></label><label>Direction<select name="direction"><option value="SOURCE">Source</option><option value="DESTINATION">Destination</option></select></label></div><label class="wormhole-only">Wormhole Core Contract<input name="core_contract" placeholder="0x…"></label><div class="dialog-actions"><button class="button primary">Extract event</button></div></form><form id="bridgeResolveForm"><p class="eyebrow">Exact-message resolution</p><div class="form-grid"><label>Reviewed route ID<input name="route_id" required></label><label>Source event ID<input name="source_event_id" required></label><label>Destination event ID<input name="destination_event_id" required></label></div><div class="dialog-actions"><button class="button secondary">Resolve exact event pair</button></div></form><div id="bridgeWorkflowResults" class="v2-inference-grid"><p class="empty">Extract the source and destination event, then resolve their exact shared message ID.</p></div></dialog>
-  <dialog id="caseHistoryDialog"><div class="dialog-head"><div><p class="eyebrow">Investigation archive</p><h2>Saved cases and trace attempts</h2></div><button class="icon-button" value="cancel" onclick="this.closest('dialog').close()" aria-label="Close">×</button></div><div id="caseHistoryResults" class="v2-transfer-list"><p class="empty">Loading saved investigation history…</p></div></dialog>  <dialog id="v2CaseDialog"><form id="v2CaseForm" method="dialog"><div class="dialog-head"><div><p class="eyebrow">New v2 live investigation</p><h2>Wallet-context trace</h2></div><button class="icon-button" value="cancel" aria-label="Close">×</button></div><p class="subtle">This starts from the investigator-supplied disputed amount at the selected wallet. The saved result records this as an approximate wallet-context seed.</p><label>Case title<input name="title" required placeholder="USDT fraud wallet trace"></label><label>Wallet<input name="wallet" required placeholder="T... or 0x..."></label><div class="form-grid"><label>Chain<select name="chain"><option value="ETHEREUM">Ethereum</option><option value="TRON">TRON</option><option value="BNB_CHAIN">BNB Chain</option><option value="POLYGON">Polygon</option></select></label><label>Asset symbol<input name="symbol" value="USDT" required></label></div><div class="form-grid"><label>Token contract<input name="contract_address" placeholder="Optional for symbol-only provider retrieval"></label><label>Decimals<input name="decimals" type="number" min="0" max="36" value="6" required></label></div><div class="form-grid"><label>Disputed amount<input name="disputed_amount" type="number" min="0.000001" step="0.000001" required></label><label>Incident time<input name="incident_time" type="datetime-local" required></label></div><div class="dialog-actions"><button value="cancel" class="button secondary">Cancel</button><button class="button primary" value="default">Create and trace</button></div></form></dialog>
+    <!-- Footer -->
+    <footer class="landing-footer">
+      <div class="landing-footer-container">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span class="landing-brand-mark">VT</span>
+          <span style="font-family: 'IBM Plex Sans', sans-serif; font-weight: 600; color: #f4f4f5;">VASP Trace</span>
+          <span style="color: #71717a;">· Evidence-first forensics workbench for SIH 182</span>
+        </div>
+
+        <div class="landing-footer-links">
+          <a href="javascript:void(0)" onclick="window.launchWorkbench()">Workbench</a>
+          <a href="#features">Features</a>
+          <a href="#sandbox">Forensics Sandbox</a>
+          <a href="#bento">Architecture</a>
+          <a href="https://github.com/developmentwithparth1311/SIH-182-temp" target="_blank" rel="noopener">Repository</a>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+
+  <!-- ==========================================================================
+       SECTION: Core Investigation Workbench View
+       ========================================================================== -->
+  <div id="workbenchView" style="display: none;">
+    <header class="topbar">
+      <a class="brand" href="javascript:void(0)" onclick="window.showLandingPage()">
+        <span class="brand-mark">VT</span>
+        <span><b>VASP TRACE</b><small>Investigation workbench</small></span>
+      </a>
+
+      <nav class="topnav" aria-label="Application navigation">
+        <a href="javascript:void(0)" onclick="window.showLandingPage()" style="color: var(--blue); font-weight: 700; display: flex; align-items: center; gap: 4px;">
+          ← Overview & Landing
+        </a>
+        <a href="#investigations">Investigations</a>
+        <a href="#connections">Connections</a>
+      </nav>
+
+      <div class="topbar-meta">
+        <button class="btn-landing-secondary" style="padding: 4px 10px; font-size: 11px;" onclick="window.showLandingPage()">
+          Back to Overview
+        </button>
+        <span id="liveSources" class="source-state">Checking providers</span>
+        <span id="apiStatus" class="status neutral">Connecting</span>
+      </div>
+    </header>
+
+    <main class="application-shell">
+      <section id="investigations" class="command-heading">
+        <div>
+          <p class="eyebrow">Investigations</p>
+          <h1>Investigation workspace</h1>
+          <p class="subtle">Open a case, trace disputed value, inspect evidence, and prepare a reviewed action package.</p>
+        </div>
+        <div class="heading-actions">
+          <button id="newV2CaseButton" class="button primary">New Investigation</button>
+          <details class="utility-menu">
+            <summary>Evidence tools</summary>
+            <div>
+              <button id="importRecordedButton" class="button secondary">Import evidence package</button>
+              <button id="importCsvButton" class="button secondary">Import trace CSV</button>
+              <button id="importIntelligenceButton" class="button secondary">Import intelligence</button>
+              <button id="reviewIntelligenceButton" class="button secondary">Review queue</button>
+              <button id="bridgeWorkflowButton" class="button secondary">Cross-chain evidence</button>
+              <button id="caseHistoryButton" class="button secondary">Case history</button>
+              <button id="v2DemoButton" class="button secondary">Load demonstration data</button>
+            </div>
+          </details>
+          <span hidden>
+            <button id="demoCaseButton">Legacy demo</button>
+            <button id="newCaseButton">Legacy investigation</button>
+          </span>
+        </div>
+      </section>
+
+      <details id="capabilities" class="capability-card card" aria-labelledby="capabilityTitle">
+        <div class="capability-head">
+          <div><p class="eyebrow">System status</p><h2 id="capabilityTitle">Chain coverage</h2></div>
+          <p>Open to inspect supported acquisition paths and capability limitations.</p>
+        </div>
+        <div id="capabilityMatrix" class="capability-matrix" aria-live="polite"><p class="empty">Loading chain capabilities…</p></div>
+      </details>
+
+      <section class="command-layout">
+        <aside class="case-rail card">
+          <div class="rail-head">
+            <div><p class="eyebrow">Case command centre</p><h2>Investigations</h2></div>
+            <button id="refreshCases" class="icon-button" title="Refresh cases" aria-label="Refresh cases">↻</button>
+          </div>
+          <div id="caseList" class="case-list"><p class="empty">Loading investigations…</p></div>
+        </aside>
+
+        <section class="workbench card">
+          <div id="emptyState" class="empty-state">
+            <div class="empty-icon">⌘</div>
+            <h2>Open an investigation</h2>
+            <p>Choose a case from the command centre or create a new wallet investigation.</p>
+          </div>
+
+          <section id="v2Workbench" hidden aria-live="polite">
+            <header class="v2-header">
+              <div>
+                <p class="eyebrow">Investigation result · v2</p>
+                <h2 id="v2CaseTitle">Evidence-first attribution result</h2>
+                <p id="v2CaseMeta" class="subtle"></p>
+              </div>
+              <div class="case-actions">
+                <button id="v2ReportButton" class="button secondary">Download v2 report</button>
+                <button id="v2DraftButton" class="button primary">Create local request draft</button>
+                <button id="closeV2Button" class="button secondary">Return to investigations</button>
+              </div>
+            </header>
+            <div id="v2DataMode" class="data-mode synthetic">SYNTHETIC DEMO</div>
+            <p id="v2Limitation" class="v2-limitation"></p>
+            <section id="v2Coverage" class="v2-coverage" aria-live="polite"></section>
+            <section class="v2-summary-grid">
+              <article><span>Disputed value</span><strong id="v2Disputed">—</strong><small>Transaction-seeded disputed lot</small></article>
+              <article><span>Accounted to terminals</span><strong id="v2Accounted">—</strong><small>Reached a defined trace endpoint</small></article>
+              <article><span>Retained / unresolved</span><strong id="v2Unresolved">—</strong><small id="v2Retained">—</small></article>
+              <article><span>Actionable endpoints</span><strong id="v2EndpointCount">—</strong><small id="v2EndpointSummary">—</small></article>
+            </section>
+            <section class="v2-layout">
+              <div class="v2-main-panel">
+                <div class="v2-section-head">
+                  <div><p class="eyebrow">Actionable endpoints</p><h3>Where the disputed flow reached</h3></div>
+                  <span class="type-badge">Evidence before routing</span>
+                </div>
+                <div id="v2Candidates" class="v2-candidate-grid"></div>
+                <div class="v2-section-head compact">
+                  <div><p class="eyebrow">Disputed-flow path</p><h3>Case-attributed transfers</h3></div>
+                </div>
+                <div id="v2Transfers" class="v2-transfer-list"></div>
+              </div>
+              <aside class="v2-evidence-panel">
+                <div class="inspector-head">
+                  <div><p class="eyebrow">Evidence drawer</p><h3>Why this claim?</h3></div>
+                  <span id="v2EvidenceType" class="type-badge">None</span>
+                </div>
+                <div id="v2Evidence" class="v2-evidence-content"><p class="empty">Select an endpoint or deposit inference to inspect its evidence.</p></div>
+              </aside>
+            </section>
+            <section class="v2-inference-panel" id="v2ActionabilityPanel">
+              <div class="v2-section-head">
+                <div><p class="eyebrow">Defensible action centre</p><h3>Amount, challenge tests, and next evidence</h3></div>
+                <span class="type-badge">Evidence-to-action</span>
+              </div>
+              <p class="subtle">The system proposes a local request amount only when endpoint evidence and the local routing profile pass their checks.</p>
+              <div id="v2Actionability" class="v2-inference-grid"><p class="empty">Actionability assessment will appear with the result.</p></div>
+            </section>
+            <section class="v2-inference-panel">
+              <div class="v2-section-head">
+                <div><p class="eyebrow">Evidence integrity</p><h3>Verify and export the result snapshot</h3></div>
+                <div class="case-actions">
+                  <button id="v2VerifyIntegrityButton" class="button secondary">Verify stored evidence</button>
+                  <button id="v2EvidenceBundleButton" class="button secondary">Download evidence bundle</button>
+                </div>
+              </div>
+              <div id="v2Integrity" class="v2-inference-grid"><p class="empty">Integrity verification has not been run for this view.</p></div>
+            </section>
+            <section class="v2-inference-panel" id="connections">
+              <div class="v2-section-head"><div><p class="eyebrow">Related investigations</p><h3>Exact shared infrastructure</h3></div></div>
+              <div id="v2Connections" class="v2-inference-grid"><p class="empty">No cross-case links loaded.</p></div>
+            </section>
+            <section class="v2-inference-panel">
+              <div class="v2-section-head"><div><p class="eyebrow">Case activity</p><h3>Investigator notes</h3></div></div>
+              <form id="v2AnnotationForm" class="annotation-form">
+                <select name="note_type">
+                  <option value="OBSERVATION">Observation</option>
+                  <option value="HYPOTHESIS">Hypothesis</option>
+                  <option value="FOLLOW_UP">Follow-up</option>
+                  <option value="VERIFIED_FINDING">Verified finding</option>
+                  <option value="LEGAL_NOTE">Legal note</option>
+                  <option value="HANDOFF">Handoff</option>
+                </select>
+                <textarea name="body" rows="2" required placeholder="Record an investigator observation or follow-up."></textarea>
+                <button class="button secondary" value="default">Add note</button>
+              </form>
+              <div id="v2Annotations" class="v2-inference-grid"><p class="empty">No investigator notes have been recorded.</p></div>
+            </section>
+            <section class="v2-inference-panel">
+              <div class="v2-section-head">
+                <div><p class="eyebrow">Deposit infrastructure hypotheses</p><h3>Rule-based inference awaiting review</h3></div>
+                <span class="type-badge">Not an operational endpoint</span>
+              </div>
+              <div id="v2Inferences" class="v2-inference-grid"></div>
+            </section>
+          </section>
+
+          <div id="caseView" hidden>
+            <header class="case-header">
+              <div>
+                <p id="caseMeta" class="eyebrow"></p>
+                <h2 id="caseTitle"></h2>
+                <p id="caseWallet" class="mono wallet"></p>
+              </div>
+              <div class="case-actions">
+                <label class="compact-field">Trace depth
+                  <select id="traceDepth">
+                    <option value="1">1 hop</option>
+                    <option value="2">2 hops</option>
+                    <option value="3" selected>3 hops</option>
+                    <option value="4">4 hops</option>
+                    <option value="5">5 hops</option>
+                  </select>
+                </label>
+                <button id="traceButton" class="button primary">Run confirmed trace</button>
+                <button id="reviewButton" class="button secondary">Mark under review</button>
+              </div>
+            </header>
+
+            <div id="notice" class="notice" hidden></div>
+            <div id="preTrace" class="pre-trace">
+              <span class="pre-trace-icon">◎</span>
+              <div>
+                <strong>Evidence-first trace is ready</strong>
+                <p>Runs retrieve confirmed transfers, preserve provider provenance, and show any coverage gaps.</p>
+              </div>
+            </div>
+
+            <div id="resultView" hidden>
+              <section class="summary-grid">
+                <article><span>Trace status</span><strong id="traceStatus">—</strong><small id="traceRun">Awaiting trace</small></article>
+                <article><span>Case flow allocated</span><strong id="attributedValue">—</strong><small id="flowMethod">Conservative allocation</small></article>
+                <article><span>Supported VASPs</span><strong id="candidateCount">—</strong><small id="nearestHop">No endpoint selected</small></article>
+                <article><span>Evidence coverage</span><strong id="coverageValue">—</strong><small id="coverageDetail">Provider retrieval</small></article>
+              </section>
+
+              <section class="investigation-layout">
+                <aside class="trace-sidebar">
+                  <div class="side-section"><div class="section-title"><span>Trace scope</span></div><dl id="scopeList" class="definition-list"></dl></div>
+                  <div class="side-section"><div class="section-title"><span>Nearest supported VASPs</span><span id="candidateBadge" class="count-badge">0</span></div><div id="candidateList" class="candidate-list"></div></div>
+                  <div class="side-section"><div class="section-title"><span>Path controls</span></div><button id="resetGraphButton" class="button secondary full">Show full trace</button><p class="microcopy">Select a VASP to isolate its shortest supporting path.</p></div>
+                </aside>
+
+                <section class="graph-panel">
+                  <div class="graph-head">
+                    <div><p class="eyebrow">Confirmed transaction graph</p><h3>Funds-of-interest view</h3></div>
+                    <div class="graph-tools">
+                      <button id="zoomOutButton" class="icon-button" title="Zoom out">−</button>
+                      <button id="zoomInButton" class="icon-button" title="Zoom in">+</button>
+                      <button id="fitGraphButton" class="button secondary small">Fit graph</button>
+                    </div>
+                  </div>
+                  <div class="graph-legend">
+                    <span><i class="legend-dot suspect"></i>Suspect</span>
+                    <span><i class="legend-dot observed"></i>Intermediary</span>
+                    <span><i class="legend-dot vasp"></i>Reviewed VASP</span>
+                    <span><i class="legend-dot frontier"></i>Evidence gap</span>
+                  </div>
+                  <div id="traceGraph" class="trace-graph" aria-label="Interactive transaction graph"></div>
+                  <p class="graph-caption">Edge width represents the case-attributed amount. Select a node or edge to inspect the underlying evidence.</p>
+                </section>
+
+                <aside class="inspector-panel">
+                  <div class="inspector-head">
+                    <div><p class="eyebrow">Evidence inspector</p><h3>Selection details</h3></div>
+                    <span id="inspectorType" class="type-badge">None</span>
+                  </div>
+                  <div id="inspectorContent" class="inspector-content">
+                    <div class="inspector-empty"><span>⌁</span><p>Select a wallet, transfer, VASP, or evidence gap in the graph.</p></div>
+                  </div>
+                </aside>
+              </section>
+
+              <section class="evidence-rail card-inset">
+                <div class="tab-bar" role="tablist">
+                  <button class="tab active" data-tab="transactions">Transactions</button>
+                  <button class="tab" data-tab="risks">Risk patterns</button>
+                  <button class="tab" data-tab="coverage">Coverage gaps</button>
+                  <button class="tab" data-tab="crosscase">Cross-case</button>
+                </div>
+                <div id="evidenceTabContent" class="tab-content"></div>
+              </section>
+
+              <section class="action-centre card-inset">
+                <div>
+                  <p class="eyebrow">Action and evidence centre</p>
+                  <h3>Review before routing</h3>
+                  <p class="subtle">A request remains a local draft until an investigator and legal reviewer approve it.</p>
+                </div>
+                <div id="actionChecklist" class="action-checklist"></div>
+                <div class="action-buttons">
+                  <button id="challengeButton" class="button secondary" disabled>Challenge top evidence</button>
+                  <button id="verifyButton" class="button secondary" disabled>Verify trace receipt</button>
+                  <button id="reportButton" class="button secondary" disabled>Download report</button>
+                  <button id="draftButton" class="button primary" disabled>Create SAHYOG draft</button>
+                </div>
+              </section>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <!-- Dialogs for Investigation Intake & Evidence Tools -->
+  <dialog id="caseDialog">
+    <form id="caseForm" method="dialog">
+      <div class="dialog-head">
+        <div><p class="eyebrow">New investigation</p><h2>Case intake</h2></div>
+        <button class="icon-button" value="cancel" aria-label="Close">×</button>
+      </div>
+      <label>Case title<input name="title" required placeholder="USDT fraud investigation"></label>
+      <label>Suspect wallet<input name="suspect_wallet" required placeholder="T... or 0x..."></label>
+      <div class="form-grid">
+        <label>Chain
+          <select name="chain">
+            <option value="TRON">TRON</option>
+            <option value="ETHEREUM">Ethereum</option>
+            <option value="BNB_CHAIN">BNB Chain</option>
+            <option value="POLYGON">Polygon</option>
+          </select>
+        </label>
+        <label>Asset<input name="token_symbol" value="USDT" required></label>
+      </div>
+      <div class="form-grid">
+        <label>Disputed amount<input name="disputed_amount" type="number" min="0" step="0.000001" placeholder="Optional"></label>
+        <label>FIR number<input name="fir_number" placeholder="Optional"></label>
+      </div>
+      <label>Investigation note<textarea name="notes" rows="3" placeholder="Optional context"></textarea></label>
+      <div class="dialog-actions">
+        <button value="cancel" class="button secondary">Cancel</button>
+        <button class="button primary" value="default">Create investigation</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="recordedImportDialog">
+    <form id="recordedImportForm" method="dialog">
+      <div class="dialog-head">
+        <div><p class="eyebrow">Recorded evidence replay</p><h2>Import a trace package</h2></div>
+        <button class="icon-button" value="cancel" aria-label="Close">×</button>
+      </div>
+      <p class="subtle">Paste a JSON package with <code>case</code> and <code>trace</code>. The case data mode must be RECORDED_REAL or SYNTHETIC. No provider request is made.</p>
+      <label>Trace package JSON
+        <textarea name="package_json" rows="14" required spellcheck="false" placeholder='{"case": {…}, "trace": {"recorded_transfers": […]}}'></textarea>
+      </label>
+      <div class="dialog-actions">
+        <button value="cancel" class="button secondary">Cancel</button>
+        <button class="button primary" value="default">Import and replay</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="csvImportDialog">
+    <form id="csvImportForm" method="dialog">
+      <div class="dialog-head">
+        <div><p class="eyebrow">Recorded evidence replay</p><h2>Import trace CSV</h2></div>
+        <button class="icon-button" value="cancel" aria-label="Close">×</button>
+      </div>
+      <p class="subtle">Paste the case JSON and its transfer CSV. This runs only on the evidence you supply and preserves the import as recorded evidence.</p>
+      <label>Case JSON
+        <textarea name="case_json" rows="8" required spellcheck="false" placeholder='{"title":"Case", "context":{"seed_type":"transaction", "chain":"ETHEREUM", …}}'></textarea>
+      </label>
+      <label>Transfer CSV
+        <textarea name="transfers_csv" rows="8" required spellcheck="false" placeholder="id,transaction_id,source_address,destination_address,raw_amount,normalized_amount,timestamp,raw_evidence_id&#10;…"></textarea>
+      </label>
+      <div class="dialog-actions">
+        <button value="cancel" class="button secondary">Cancel</button>
+        <button class="button primary" value="default">Import and replay</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="intelligenceImportDialog">
+    <form id="intelligenceImportForm" method="dialog">
+      <div class="dialog-head">
+        <div><p class="eyebrow">Attribution evidence</p><h2>Import intelligence CSV</h2></div>
+        <button class="icon-button" value="cancel" aria-label="Close">×</button>
+      </div>
+      <p class="subtle">Import source-backed address assertions for review. Imported assertions begin unreviewed unless a reviewer state is explicitly present in the CSV.</p>
+      <label>Entity assertion CSV
+        <textarea name="csv_text" rows="13" required spellcheck="false" placeholder="entity_name,entity_type,address,chain,role,assertion_type,source_name,source_type,trust_tier,retrieved_at&#10;…"></textarea>
+      </label>
+      <div class="dialog-actions">
+        <button value="cancel" class="button secondary">Cancel</button>
+        <button class="button primary" value="default">Import intelligence</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="intelligenceReviewDialog">
+    <div class="dialog-head">
+      <div><p class="eyebrow">Attribution evidence</p><h2>Review imported assertions</h2></div>
+      <button class="icon-button" value="cancel" onclick="this.closest('dialog').close()" aria-label="Close">×</button>
+    </div>
+    <form id="intelligenceLookupForm">
+      <div class="form-grid">
+        <label>Address<input name="address" required placeholder="0x… or T…"></label>
+        <label>Chain
+          <select name="chain">
+            <option value="ETHEREUM">Ethereum</option>
+            <option value="TRON">TRON</option>
+            <option value="BNB_CHAIN">BNB Chain</option>
+            <option value="POLYGON">Polygon</option>
+          </select>
+        </label>
+      </div>
+      <div class="dialog-actions">
+        <button class="button primary">Find assertions</button>
+      </div>
+    </form>
+    <div id="intelligenceReviewResults" class="v2-inference-grid">
+      <p class="empty">Search an imported address to review its source and assertion state.</p>
+    </div>
+  </dialog>
+
+  <dialog id="bridgeWorkflowDialog">
+    <div class="dialog-head">
+      <div><p class="eyebrow">Cross-chain evidence</p><h2>Bridge-event workflow</h2></div>
+      <button class="icon-button" value="cancel" onclick="this.closest('dialog').close()" aria-label="Close">×</button>
+    </div>
+    <p class="subtle">Use retained evidence records. The workflow never links transfers by amount or timing alone.</p>
+    <form id="bridgeExtractForm">
+      <label>Protocol
+        <select name="mode">
+          <option value="normal">Normalized bridge event</option>
+          <option value="wormhole">Wormhole EVM receipt log</option>
+        </select>
+      </label>
+      <label>Raw evidence ID<input name="raw_evidence_id" required placeholder="EVID-…"></label>
+      <label>Canonical transfer JSON<textarea name="transfer_json" rows="5" required spellcheck="false" placeholder='{"id":"…","transaction_id":"…",…}'></textarea></label>
+      <div class="form-grid">
+        <label>Protocol / Wormhole chain ID<input name="protocol" value="WORMHOLE" required></label>
+        <label>Direction
+          <select name="direction">
+            <option value="SOURCE">Source</option>
+            <option value="DESTINATION">Destination</option>
+          </select>
+        </label>
+      </div>
+      <label class="wormhole-only">Wormhole Core Contract<input name="core_contract" placeholder="0x…"></label>
+      <div class="dialog-actions">
+        <button class="button primary">Extract event</button>
+      </div>
+    </form>
+    <form id="bridgeResolveForm">
+      <p class="eyebrow">Exact-message resolution</p>
+      <div class="form-grid">
+        <label>Reviewed route ID<input name="route_id" required></label>
+        <label>Source event ID<input name="source_event_id" required></label>
+        <label>Destination event ID<input name="destination_event_id" required></label>
+      </div>
+      <div class="dialog-actions">
+        <button class="button secondary">Resolve exact event pair</button>
+      </div>
+    </form>
+    <div id="bridgeWorkflowResults" class="v2-inference-grid">
+      <p class="empty">Extract the source and destination event, then resolve their exact shared message ID.</p>
+    </div>
+  </dialog>
+
+  <dialog id="caseHistoryDialog">
+    <div class="dialog-head">
+      <div><p class="eyebrow">Investigation archive</p><h2>Saved cases and trace attempts</h2></div>
+      <button class="icon-button" value="cancel" onclick="this.closest('dialog').close()" aria-label="Close">×</button>
+    </div>
+    <div id="caseHistoryResults" class="v2-transfer-list">
+      <p class="empty">Loading saved investigation history…</p>
+    </div>
+  </dialog>
+
+  <dialog id="v2CaseDialog">
+    <form id="v2CaseForm" method="dialog">
+      <div class="dialog-head">
+        <div><p class="eyebrow">New v2 live investigation</p><h2>Wallet-context trace</h2></div>
+        <button class="icon-button" value="cancel" aria-label="Close">×</button>
+      </div>
+      <p class="subtle">This starts from the investigator-supplied disputed amount at the selected wallet. The saved result records this as an approximate wallet-context seed.</p>
+      <label>Case title<input name="title" required placeholder="USDT fraud wallet trace"></label>
+      <label>Wallet<input name="wallet" required placeholder="T... or 0x..."></label>
+      <div class="form-grid">
+        <label>Chain
+          <select name="chain">
+            <option value="ETHEREUM">Ethereum</option>
+            <option value="TRON">TRON</option>
+            <option value="BNB_CHAIN">BNB Chain</option>
+            <option value="POLYGON">Polygon</option>
+          </select>
+        </label>
+        <label>Asset symbol<input name="symbol" value="USDT" required></label>
+      </div>
+      <div class="form-grid">
+        <label>Token contract<input name="contract_address" placeholder="Optional for symbol-only provider retrieval"></label>
+        <label>Decimals<input name="decimals" type="number" min="0" max="36" value="6" required></label>
+      </div>
+      <div class="form-grid">
+        <label>Disputed amount<input name="disputed_amount" type="number" min="0.000001" step="0.000001" required></label>
+        <label>Incident time<input name="incident_time" type="datetime-local" required></label>
+      </div>
+      <div class="dialog-actions">
+        <button value="cancel" class="button secondary">Cancel</button>
+        <button class="button primary" value="default">Create and trace</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Scripts -->
   <script src="/static/vendor/cytoscape.min.js"></script>
   <script src="/static/graph.js"></script>
   <script src="/static/app.js"></script>
   <script src="/static/v2.js"></script>
+  <script src="/static/landing.js"></script>
 </body>
 </html>
