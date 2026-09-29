@@ -328,9 +328,6 @@
       </nav>
 
       <div class="topbar-meta">
-        <button class="btn-landing-secondary" style="padding: 4px 10px; font-size: 11px;" onclick="window.showLandingPage()">
-          Back to Overview
-        </button>
         <span id="liveSources" class="source-state">Checking providers</span>
         <span id="apiStatus" class="status neutral">Connecting</span>
       </div>
@@ -346,6 +343,7 @@
         <div class="heading-actions">
           <button id="newV2CaseButton" class="button primary">New Investigation</button>
           <button id="demoCaseButton" class="button secondary">Load Graph Demo</button>
+          <button id="v2DemoButton" class="button secondary" style="border-color: #7c3aed; color: #c4b5fd;">▶ Try v2 Attribution Demo</button>
           <details class="utility-menu">
             <summary>Evidence tools</summary>
             <div>
@@ -355,12 +353,49 @@
               <button id="reviewIntelligenceButton" class="button secondary">Review queue</button>
               <button id="bridgeWorkflowButton" class="button secondary">Cross-chain evidence</button>
               <button id="caseHistoryButton" class="button secondary">Case history</button>
-              <button id="v2DemoButton" class="button secondary">Load v2 demonstration</button>
               <button id="newCaseButton" class="button secondary">Legacy case intake</button>
             </div>
           </details>
         </div>
       </section>
+
+      <!-- Quick-access feature bar: shows showcase-critical actions always visible -->
+      <div class="feature-bar">
+        <button id="featureBarIntelligence" class="feature-bar-btn" onclick="document.getElementById('reviewIntelligenceButton').click()">
+          <span class="feature-bar-icon">🔍</span>
+          <span>
+            <b>Intelligence Review</b>
+            <small>Imported VASP assertions · approve / reject</small>
+          </span>
+          <span class="feature-bar-badge" id="featureBarIntelBadge">Req #10</span>
+        </button>
+        <button id="featureBarCrossChain" class="feature-bar-btn" onclick="document.getElementById('bridgeWorkflowButton').click()">
+          <span class="feature-bar-icon">⛓</span>
+          <span>
+            <b>Cross-chain Evidence</b>
+            <small>Bridge events · exact message ID resolution</small>
+          </span>
+          <span class="feature-bar-badge">Req #9</span>
+        </button>
+        <button id="featureBarHistory" class="feature-bar-btn" onclick="document.getElementById('caseHistoryButton').click()">
+          <span class="feature-bar-icon">📂</span>
+          <span>
+            <b>Case History</b>
+            <small>Previous runs · failed jobs · reopen</small>
+          </span>
+          <span class="feature-bar-badge">Req #11</span>
+        </button>
+        <button id="featureBarImport" class="feature-bar-btn" onclick="document.getElementById('importIntelligenceButton').click()">
+          <span class="feature-bar-icon">📥</span>
+          <span>
+            <b>Import Intelligence</b>
+            <small>Source-backed address assertions CSV</small>
+          </span>
+          <span class="feature-bar-badge">Req #10</span>
+        </button>
+      </div>
+
+      <div id="globalNotice" class="notice" hidden></div>
 
       <details id="capabilities" class="capability-card card" aria-labelledby="capabilityTitle">
         <div class="capability-head">
@@ -381,9 +416,68 @@
 
         <section class="workbench card">
           <div id="emptyState" class="empty-state">
-            <div class="empty-icon">⌘</div>
-            <h2>Open an investigation</h2>
-            <p>Choose a case from the command centre or create a new wallet investigation.</p>
+            <div class="empty-hero">
+              <div class="empty-icon">⌘</div>
+              <h2>Investigation Workbench Ready</h2>
+              <p>Start with a guided demo to explore all features, or open an existing case from the command centre.</p>
+              <div class="empty-cta-row">
+                <button class="button primary" onclick="document.getElementById('v2DemoButton').click()">▶ Load Attribution Demo</button>
+                <button class="button secondary" onclick="document.getElementById('demoCaseButton').click()">Load Graph Demo</button>
+                <button class="button secondary" onclick="document.getElementById('newV2CaseButton').click()">New Investigation</button>
+              </div>
+            </div>
+            <div class="feature-showcase">
+              <div class="showcase-card" onclick="document.getElementById('v2DemoButton').click()">
+                <span class="showcase-num">8</span>
+                <b>Guided Demo</b>
+                <p>Simulated multi-hop USDT fraud trace. Explore without API keys.</p>
+              </div>
+              <div class="showcase-card">
+                <span class="showcase-num">3</span>
+                <b>Coverage &amp; Gaps</b>
+                <p>Providers queried, retrieval failures, and unexplored frontiers visible per run.</p>
+              </div>
+              <div class="showcase-card">
+                <span class="showcase-num">4</span>
+                <b>Transaction Graph</b>
+                <p>Cytoscape graph: suspect wallet → intermediaries → verified VASP → evidence gaps.</p>
+              </div>
+              <div class="showcase-card">
+                <span class="showcase-num">5</span>
+                <b>VASP Attribution</b>
+                <p>Route, hop count, attributed amount, confidence band, and label sources per endpoint.</p>
+              </div>
+              <div class="showcase-card">
+                <span class="showcase-num">6</span>
+                <b>Evidence Inspector</b>
+                <p>Click any node or transfer for tx references, source, retrieval time, and limitations.</p>
+              </div>
+              <div class="showcase-card">
+                <span class="showcase-num">7</span>
+                <b>Action Centre</b>
+                <p>Evidence → bounded draft amount → challenge tests → next evidence steps. Draft-only.</p>
+              </div>
+              <div class="showcase-card" onclick="document.getElementById('bridgeWorkflowButton').click()">
+                <span class="showcase-num">9</span>
+                <b>Cross-chain Boundary</b>
+                <p>Bridge events, message ID resolution, and BRIDGE_UNRESOLVED boundaries.</p>
+              </div>
+              <div class="showcase-card" onclick="document.getElementById('reviewIntelligenceButton').click()">
+                <span class="showcase-num">10</span>
+                <b>Intelligence Queue</b>
+                <p>Review imported VASP assertions. Unreviewed data cannot become a verified attribution.</p>
+              </div>
+              <div class="showcase-card" onclick="document.getElementById('caseHistoryButton').click()">
+                <span class="showcase-num">11</span>
+                <b>Case History</b>
+                <p>Reopen saved cases, see previous runs, and inspect interrupted or failed trace jobs.</p>
+              </div>
+              <div class="showcase-card">
+                <span class="showcase-num">12</span>
+                <b>Exportable Report</b>
+                <p>PDF + evidence bundle with graph, attribution rationale, coverage gaps, and limitations.</p>
+              </div>
+            </div>
           </div>
 
           <section id="v2Workbench" hidden aria-live="polite">
@@ -394,14 +488,20 @@
                 <p id="v2CaseMeta" class="subtle"></p>
               </div>
               <div class="case-actions">
-                <button id="v2ReportButton" class="button secondary">Download v2 report</button>
+                <button id="v2ReportButton" class="button secondary" title="Download PDF report with graph, attribution rationale, evidence references, and limitations">Download PDF Report</button>
                 <button id="v2DraftButton" class="button primary">Create local request draft</button>
+                <button id="v2EvidenceBundleButton" class="button secondary" title="Download ZIP with evidence manifest, raw records, and audit chain">Download Evidence Bundle</button>
                 <button id="closeV2Button" class="button secondary">Return to investigations</button>
               </div>
             </header>
             <div id="v2DataMode" class="data-mode synthetic">SYNTHETIC DEMO</div>
             <p id="v2Limitation" class="v2-limitation"></p>
-            <section id="v2Coverage" class="v2-coverage" aria-live="polite"></section>
+            <section id="v2Coverage" class="v2-coverage" aria-live="polite">
+              <div class="v2-coverage-head">
+                <p class="eyebrow">Evidence acquisition</p>
+                <h3>Provider coverage &amp; retrieval status</h3>
+              </div>
+            </section>
             <section class="v2-summary-grid">
               <article><span>Disputed value</span><strong id="v2Disputed">—</strong><small>Transaction-seeded disputed lot</small></article>
               <article><span>Accounted to terminals</span><strong id="v2Accounted">—</strong><small>Reached a defined trace endpoint</small></article>
@@ -441,13 +541,16 @@
                 <div><p class="eyebrow">Evidence integrity</p><h3>Verify and export the result snapshot</h3></div>
                 <div class="case-actions">
                   <button id="v2VerifyIntegrityButton" class="button secondary">Verify stored evidence</button>
-                  <button id="v2EvidenceBundleButton" class="button secondary">Download evidence bundle</button>
                 </div>
               </div>
               <div id="v2Integrity" class="v2-inference-grid"><p class="empty">Integrity verification has not been run for this view.</p></div>
             </section>
             <section class="v2-inference-panel" id="connections">
-              <div class="v2-section-head"><div><p class="eyebrow">Related investigations</p><h3>Exact shared infrastructure</h3></div></div>
+              <div class="v2-section-head">
+                <div><p class="eyebrow">Related investigations · Cross-case &amp; cross-chain links</p><h3>Exact shared infrastructure</h3></div>
+                <button class="button secondary small" onclick="document.getElementById('bridgeWorkflowButton').click()">⛓ Cross-chain evidence</button>
+              </div>
+              <p class="subtle" style="margin: 0 0 8px; font-size: 11px;">Connections are established only on exact shared addresses, transactions, or reviewed entity labels — not timing or amount alone.</p>
               <div id="v2Connections" class="v2-inference-grid"><p class="empty">No cross-case links loaded.</p></div>
             </section>
             <section class="v2-inference-panel">
@@ -588,6 +691,10 @@
       <div class="dialog-head">
         <div><p class="eyebrow">New investigation</p><h2>Case intake</h2></div>
         <button type="button" class="icon-button" onclick="this.closest('dialog').close()" aria-label="Close">×</button>
+      </div>
+      <div class="intake-provenance-note">
+        <span class="provenance-tag investigator">Investigator-supplied</span> Case title, wallet, disputed amount, FIR number, chain, and notes are entered by the investigator.
+        <span class="provenance-tag chain">Chain-retrieved</span> Transfer records, timestamps, and hop data are retrieved from public explorer APIs at trace time.
       </div>
       <label>Case title<input name="title" required placeholder="USDT fraud investigation"></label>
       <label>Suspect wallet<input name="suspect_wallet" required placeholder="T... or 0x..."></label>
@@ -755,7 +862,10 @@
         <div><p class="eyebrow">New v2 live investigation</p><h2>Wallet-context trace</h2></div>
         <button type="button" class="icon-button" onclick="this.closest('dialog').close()" aria-label="Close">×</button>
       </div>
-      <p class="subtle">This starts from the investigator-supplied disputed amount at the selected wallet. The saved result records this as an approximate wallet-context seed.</p>
+      <div class="intake-provenance-note">
+        <span class="provenance-tag investigator">Investigator-supplied</span> Case title, wallet, chain, disputed amount, and incident time are entered by the investigator.
+        <span class="provenance-tag chain">Chain-retrieved</span> Transfers, block timestamps, and provider provenance are retrieved at trace time from configured public APIs.
+      </div>
       <label>Case title<input name="title" required placeholder="USDT fraud wallet trace"></label>
       <label>Wallet<input name="wallet" required placeholder="T... or 0x..."></label>
       <div class="form-grid">
