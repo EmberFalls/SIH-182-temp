@@ -24,7 +24,6 @@
     <!-- Sticky Navbar -->
     <header class="landing-header">
       <div class="landing-brand" onclick="window.scrollTo({top: 0, behavior: 'smooth'})">
-        <span class="landing-brand-mark">VT</span>
         <span class="landing-brand-name">vasp <span>trace</span></span>
       </div>
 
@@ -295,7 +294,6 @@
     <footer class="landing-footer">
       <div class="landing-footer-container">
         <div style="display: flex; align-items: center; gap: 10px;">
-          <span class="landing-brand-mark">VT</span>
           <span style="font-family: 'IBM Plex Sans', sans-serif; font-weight: 600; color: #f4f4f5;">VASP Trace</span>
           <span style="color: #71717a;">· Evidence-first forensics workbench for SIH 182</span>
         </div>
@@ -318,7 +316,6 @@
   <div id="workbenchView" style="display: none;">
     <header class="topbar">
       <a class="brand" href="javascript:void(0)" onclick="window.showLandingPage()">
-        <span class="brand-mark">VT</span>
         <span><b>VASP TRACE</b><small>Investigation workbench</small></span>
       </a>
 
@@ -348,6 +345,7 @@
         </div>
         <div class="heading-actions">
           <button id="newV2CaseButton" class="button primary">New Investigation</button>
+          <button id="demoCaseButton" class="button secondary">Load Graph Demo</button>
           <details class="utility-menu">
             <summary>Evidence tools</summary>
             <div>
@@ -357,13 +355,10 @@
               <button id="reviewIntelligenceButton" class="button secondary">Review queue</button>
               <button id="bridgeWorkflowButton" class="button secondary">Cross-chain evidence</button>
               <button id="caseHistoryButton" class="button secondary">Case history</button>
-              <button id="v2DemoButton" class="button secondary">Load demonstration data</button>
+              <button id="v2DemoButton" class="button secondary">Load v2 demonstration</button>
+              <button id="newCaseButton" class="button secondary">Legacy case intake</button>
             </div>
           </details>
-          <span hidden>
-            <button id="demoCaseButton">Legacy demo</button>
-            <button id="newCaseButton">Legacy investigation</button>
-          </span>
         </div>
       </section>
 
@@ -592,7 +587,7 @@
     <form id="caseForm" method="dialog">
       <div class="dialog-head">
         <div><p class="eyebrow">New investigation</p><h2>Case intake</h2></div>
-        <button class="icon-button" value="cancel" aria-label="Close">×</button>
+        <button type="button" class="icon-button" onclick="this.closest('dialog').close()" aria-label="Close">×</button>
       </div>
       <label>Case title<input name="title" required placeholder="USDT fraud investigation"></label>
       <label>Suspect wallet<input name="suspect_wallet" required placeholder="T... or 0x..."></label>
@@ -613,7 +608,7 @@
       </div>
       <label>Investigation note<textarea name="notes" rows="3" placeholder="Optional context"></textarea></label>
       <div class="dialog-actions">
-        <button value="cancel" class="button secondary">Cancel</button>
+        <button type="button" class="button secondary" onclick="this.closest('dialog').close()">Cancel</button>
         <button class="button primary" value="default">Create investigation</button>
       </div>
     </form>
@@ -623,14 +618,14 @@
     <form id="recordedImportForm" method="dialog">
       <div class="dialog-head">
         <div><p class="eyebrow">Recorded evidence replay</p><h2>Import a trace package</h2></div>
-        <button class="icon-button" value="cancel" aria-label="Close">×</button>
+        <button type="button" class="icon-button" onclick="this.closest('dialog').close()" aria-label="Close">×</button>
       </div>
       <p class="subtle">Paste a JSON package with <code>case</code> and <code>trace</code>. The case data mode must be RECORDED_REAL or SYNTHETIC. No provider request is made.</p>
       <label>Trace package JSON
         <textarea name="package_json" rows="14" required spellcheck="false" placeholder='{"case": {…}, "trace": {"recorded_transfers": […]}}'></textarea>
       </label>
       <div class="dialog-actions">
-        <button value="cancel" class="button secondary">Cancel</button>
+        <button type="button" class="button secondary" onclick="this.closest('dialog').close()">Cancel</button>
         <button class="button primary" value="default">Import and replay</button>
       </div>
     </form>
@@ -640,7 +635,7 @@
     <form id="csvImportForm" method="dialog">
       <div class="dialog-head">
         <div><p class="eyebrow">Recorded evidence replay</p><h2>Import trace CSV</h2></div>
-        <button class="icon-button" value="cancel" aria-label="Close">×</button>
+        <button type="button" class="icon-button" onclick="this.closest('dialog').close()" aria-label="Close">×</button>
       </div>
       <p class="subtle">Paste the case JSON and its transfer CSV. This runs only on the evidence you supply and preserves the import as recorded evidence.</p>
       <label>Case JSON
@@ -650,7 +645,7 @@
         <textarea name="transfers_csv" rows="8" required spellcheck="false" placeholder="id,transaction_id,source_address,destination_address,raw_amount,normalized_amount,timestamp,raw_evidence_id&#10;…"></textarea>
       </label>
       <div class="dialog-actions">
-        <button value="cancel" class="button secondary">Cancel</button>
+        <button type="button" class="button secondary" onclick="this.closest('dialog').close()">Cancel</button>
         <button class="button primary" value="default">Import and replay</button>
       </div>
     </form>
@@ -660,23 +655,23 @@
     <form id="intelligenceImportForm" method="dialog">
       <div class="dialog-head">
         <div><p class="eyebrow">Attribution evidence</p><h2>Import intelligence CSV</h2></div>
-        <button class="icon-button" value="cancel" aria-label="Close">×</button>
+        <button type="button" class="icon-button" onclick="this.closest('dialog').close()" aria-label="Close">×</button>
       </div>
       <p class="subtle">Import source-backed address assertions for review. Imported assertions begin unreviewed unless a reviewer state is explicitly present in the CSV.</p>
       <label>Entity assertion CSV
         <textarea name="csv_text" rows="13" required spellcheck="false" placeholder="entity_name,entity_type,address,chain,role,assertion_type,source_name,source_type,trust_tier,retrieved_at&#10;…"></textarea>
       </label>
       <div class="dialog-actions">
-        <button value="cancel" class="button secondary">Cancel</button>
+        <button type="button" class="button secondary" onclick="this.closest('dialog').close()">Cancel</button>
         <button class="button primary" value="default">Import intelligence</button>
       </div>
     </form>
   </dialog>
 
   <dialog id="intelligenceReviewDialog">
-    <div class="dialog-head">
+    <div class="dialog-head" style="padding: 20px 20px 0;">
       <div><p class="eyebrow">Attribution evidence</p><h2>Review imported assertions</h2></div>
-      <button class="icon-button" value="cancel" onclick="this.closest('dialog').close()" aria-label="Close">×</button>
+      <button type="button" class="icon-button" onclick="this.closest('dialog').close()" aria-label="Close">×</button>
     </div>
     <form id="intelligenceLookupForm">
       <div class="form-grid">
@@ -694,18 +689,18 @@
         <button class="button primary">Find assertions</button>
       </div>
     </form>
-    <div id="intelligenceReviewResults" class="v2-inference-grid">
+    <div id="intelligenceReviewResults" class="v2-inference-grid" style="margin: 0 20px 20px;">
       <p class="empty">Search an imported address to review its source and assertion state.</p>
     </div>
   </dialog>
 
   <dialog id="bridgeWorkflowDialog">
-    <div class="dialog-head">
+    <div class="dialog-head" style="padding: 20px 20px 0;">
       <div><p class="eyebrow">Cross-chain evidence</p><h2>Bridge-event workflow</h2></div>
-      <button class="icon-button" value="cancel" onclick="this.closest('dialog').close()" aria-label="Close">×</button>
+      <button type="button" class="icon-button" onclick="this.closest('dialog').close()" aria-label="Close">×</button>
     </div>
-    <p class="subtle">Use retained evidence records. The workflow never links transfers by amount or timing alone.</p>
-    <form id="bridgeExtractForm">
+    <p class="subtle" style="margin: 8px 20px 16px;">Use retained evidence records. The workflow never links transfers by amount or timing alone.</p>
+    <form id="bridgeExtractForm" style="padding: 0 20px 16px;">
       <label>Protocol
         <select name="mode">
           <option value="normal">Normalized bridge event</option>
@@ -713,7 +708,7 @@
         </select>
       </label>
       <label>Raw evidence ID<input name="raw_evidence_id" required placeholder="EVID-…"></label>
-      <label>Canonical transfer JSON<textarea name="transfer_json" rows="5" required spellcheck="false" placeholder='{"id":"…","transaction_id":"…",…}'></textarea></label>
+      <label>Canonical transfer JSON<textarea name="transfer_json" rows="4" required spellcheck="false" placeholder='{"id":"…","transaction_id":"…",…}'></textarea></label>
       <div class="form-grid">
         <label>Protocol / Wormhole chain ID<input name="protocol" value="WORMHOLE" required></label>
         <label>Direction
@@ -723,12 +718,12 @@
           </select>
         </label>
       </div>
-      <label class="wormhole-only">Wormhole Core Contract<input name="core_contract" placeholder="0x…"></label>
+      <label class="wormhole-only" style="margin: 0;">Wormhole Core Contract<input name="core_contract" placeholder="0x…"></label>
       <div class="dialog-actions">
         <button class="button primary">Extract event</button>
       </div>
     </form>
-    <form id="bridgeResolveForm">
+    <form id="bridgeResolveForm" style="padding: 0 20px 16px;">
       <p class="eyebrow">Exact-message resolution</p>
       <div class="form-grid">
         <label>Reviewed route ID<input name="route_id" required></label>
@@ -739,17 +734,17 @@
         <button class="button secondary">Resolve exact event pair</button>
       </div>
     </form>
-    <div id="bridgeWorkflowResults" class="v2-inference-grid">
+    <div id="bridgeWorkflowResults" class="v2-inference-grid" style="margin: 0 20px 20px;">
       <p class="empty">Extract the source and destination event, then resolve their exact shared message ID.</p>
     </div>
   </dialog>
 
   <dialog id="caseHistoryDialog">
-    <div class="dialog-head">
+    <div class="dialog-head" style="padding: 20px 20px 0;">
       <div><p class="eyebrow">Investigation archive</p><h2>Saved cases and trace attempts</h2></div>
-      <button class="icon-button" value="cancel" onclick="this.closest('dialog').close()" aria-label="Close">×</button>
+      <button type="button" class="icon-button" onclick="this.closest('dialog').close()" aria-label="Close">×</button>
     </div>
-    <div id="caseHistoryResults" class="v2-transfer-list">
+    <div id="caseHistoryResults" class="v2-transfer-list" style="margin: 16px 20px 20px;">
       <p class="empty">Loading saved investigation history…</p>
     </div>
   </dialog>
@@ -758,7 +753,7 @@
     <form id="v2CaseForm" method="dialog">
       <div class="dialog-head">
         <div><p class="eyebrow">New v2 live investigation</p><h2>Wallet-context trace</h2></div>
-        <button class="icon-button" value="cancel" aria-label="Close">×</button>
+        <button type="button" class="icon-button" onclick="this.closest('dialog').close()" aria-label="Close">×</button>
       </div>
       <p class="subtle">This starts from the investigator-supplied disputed amount at the selected wallet. The saved result records this as an approximate wallet-context seed.</p>
       <label>Case title<input name="title" required placeholder="USDT fraud wallet trace"></label>
@@ -783,7 +778,7 @@
         <label>Incident time<input name="incident_time" type="datetime-local" required></label>
       </div>
       <div class="dialog-actions">
-        <button value="cancel" class="button secondary">Cancel</button>
+        <button type="button" class="button secondary" onclick="this.closest('dialog').close()">Cancel</button>
         <button class="button primary" value="default">Create and trace</button>
       </div>
     </form>
