@@ -26,6 +26,10 @@ class CrossCaseIndexerV2:
         return [self.store.save_case_connection_v2(item) for item in created]
 
     def _connections_between(self, left: InvestigationResultV2, right: InvestigationResultV2) -> list[CaseConnectionV2]:
+        # Keep one stable orientation for each pair so re-indexing either result
+        # does not create a second, reversed copy of the same investigative lead.
+        if left.case_id > right.case_id:
+            left, right = right, left
         links: list[CaseConnectionV2] = []
         left_addresses = {address.lower(): transfer.id for transfer in left.transfers for address in (transfer.source_address, transfer.destination_address)}
         right_addresses = {address.lower(): transfer.id for transfer in right.transfers for address in (transfer.source_address, transfer.destination_address)}

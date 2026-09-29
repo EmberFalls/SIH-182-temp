@@ -1619,3 +1619,323 @@ input:focus, select:focus, textarea:focus {
     width: 100%;
   }
 }
+
+/* Persistent investigation and cross-case showcase boards */
+.showcase-section {
+  margin: 0 0 16px;
+  padding: 18px;
+  border: 1px solid var(--dash-border);
+  border-radius: 10px;
+  background: linear-gradient(145deg, rgba(139, 92, 246, 0.055), transparent 52%), var(--dash-card);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.2);
+  scroll-margin-top: 72px;
+}
+
+.showcase-section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  margin-bottom: 14px;
+}
+
+.showcase-section-head h2 {
+  margin: 2px 0 4px;
+  color: var(--dash-text-primary);
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+
+.showcase-section-head .subtle {
+  margin: 0;
+  max-width: 720px;
+  color: var(--dash-text-secondary);
+  font-size: 12px;
+}
+
+.showcase-section-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.showcase-board-status {
+  min-height: 16px;
+  margin: -4px 0 12px;
+  color: var(--dash-text-muted);
+  font-size: 11px;
+}
+
+.showcase-case-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 12px;
+}
+
+.showcase-case-card,
+.showcase-connection-card,
+.showcase-empty-card {
+  min-width: 0;
+  border: 1px solid var(--dash-border);
+  border-radius: 9px;
+  background: var(--dash-card-secondary);
+}
+
+.showcase-case-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 15px;
+  transition: border-color 150ms ease, background 150ms ease, transform 150ms ease;
+}
+
+.showcase-case-card:hover {
+  border-color: rgba(139, 92, 246, 0.5);
+  background: #17171d;
+  transform: translateY(-1px);
+}
+
+.showcase-card-top,
+.showcase-case-result,
+.showcase-connection-kind,
+.showcase-connection-pair,
+.showcase-relation-key {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.showcase-mode,
+.showcase-case-status {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 3px 8px;
+  border: 1px solid var(--dash-border);
+  color: var(--dash-text-secondary);
+  font-size: 9px;
+  font-weight: 750;
+  letter-spacing: 0.055em;
+  line-height: 1.35;
+  text-transform: uppercase;
+}
+
+.showcase-mode.simulated {
+  border-color: var(--dash-warning-border);
+  background: var(--dash-warning-bg);
+  color: #fbbf24;
+}
+
+.showcase-mode.live {
+  border-color: var(--dash-clean-border);
+  background: var(--dash-clean-bg);
+  color: #34d399;
+}
+
+.showcase-case-status {
+  padding: 2px 7px;
+  color: var(--dash-text-muted);
+  font-weight: 600;
+}
+
+.showcase-case-ref {
+  margin: 0;
+  color: var(--dash-text-muted);
+  font-family: 'Geist Mono', 'IBM Plex Mono', monospace;
+  font-size: 10px;
+}
+
+.showcase-case-card h3 {
+  margin: -6px 0 0;
+  color: var(--dash-text-primary);
+  font-size: 15px;
+  font-weight: 620;
+  line-height: 1.4;
+}
+
+.showcase-case-meta {
+  display: grid;
+  gap: 4px;
+  color: var(--dash-text-secondary);
+  font-size: 10px;
+}
+
+.showcase-case-meta span:last-child {
+  overflow: hidden;
+  color: var(--dash-text-muted);
+  font-family: 'Geist Mono', 'IBM Plex Mono', monospace;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.showcase-case-result {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 3px;
+  border-top: 1px solid var(--dash-border-subtle);
+  padding-top: 10px;
+}
+
+.showcase-case-result strong {
+  color: #c4b5fd;
+  font-family: 'Geist Mono', 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.showcase-case-result span {
+  color: var(--dash-text-muted);
+  font-size: 10px;
+}
+
+.showcase-open-case {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-top: auto;
+}
+
+.showcase-connection-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  gap: 10px;
+}
+
+.showcase-connection-card {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 14px;
+}
+
+.showcase-connection-kind {
+  justify-content: flex-start;
+  color: #c4b5fd;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.connection-mark {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid var(--dash-info-border);
+  border-radius: 6px;
+  background: var(--dash-info-bg);
+  color: #c4b5fd;
+  font-size: 15px;
+}
+
+.showcase-connection-pair {
+  align-items: stretch;
+}
+
+.showcase-case-link {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid var(--dash-border);
+  border-radius: 6px;
+  background: var(--dash-card);
+  padding: 8px;
+  color: var(--dash-text-primary);
+  font-size: 10px;
+  line-height: 1.45;
+  text-align: left;
+  cursor: pointer;
+}
+
+.showcase-case-link:hover,
+.showcase-case-link:focus-visible {
+  border-color: var(--dash-info);
+  outline: none;
+}
+
+.showcase-connection-pair > span {
+  align-self: center;
+  color: var(--dash-text-muted);
+}
+
+.showcase-relation-key {
+  justify-content: flex-start;
+  margin: 0;
+  color: var(--dash-text-muted);
+  font-size: 10px;
+}
+
+.showcase-relation-key code {
+  overflow: hidden;
+  max-width: 65%;
+  border: 1px solid var(--dash-border);
+  border-radius: 4px;
+  background: #0b0b0f;
+  padding: 3px 6px;
+  color: #d4d4d8;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.showcase-connection-explanation {
+  margin: 0;
+  color: var(--dash-text-secondary);
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.showcase-connection-card > small {
+  border-top: 1px solid var(--dash-border-subtle);
+  padding-top: 8px;
+  color: var(--dash-text-muted);
+  font-size: 9px;
+}
+
+.showcase-empty,
+.showcase-empty-card {
+  margin: 0;
+  color: var(--dash-text-muted);
+  font-size: 12px;
+}
+
+.showcase-empty-card {
+  grid-column: 1 / -1;
+  padding: 18px;
+}
+
+.showcase-empty-card strong {
+  color: var(--dash-text-primary);
+  font-size: 13px;
+}
+
+.showcase-empty-card p {
+  margin: 5px 0 14px;
+  color: var(--dash-text-secondary);
+  font-size: 11px;
+}
+
+@media (max-width: 720px) {
+  .showcase-section {
+    padding: 14px;
+  }
+  .showcase-section-head {
+    flex-direction: column;
+  }
+  .showcase-section-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+  .showcase-section-actions #loadShowcaseCases {
+    flex: 1;
+  }
+  .showcase-connection-pair {
+    flex-direction: column;
+  }
+  .showcase-connection-pair > span {
+    transform: rotate(90deg);
+  }
+}

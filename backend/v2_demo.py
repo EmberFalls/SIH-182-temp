@@ -35,6 +35,10 @@ from .storage import Store
 
 
 DEMO_REF = "DEMO/V2/001"
+SHOWCASE_CASES = (
+    ("DEMO/V2/002", "SYNTHETIC DEMO — Repeated collector deposits", 3600, 0x22222222),
+    ("DEMO/V2/003", "SYNTHETIC DEMO — Layered collector route", 7200, 0x33333333),
+)
 ROOT = "0x1f2e3d4c5b6a79808192a3b4c5d6e7f8091a2b3c"
 DEPOSIT = "0x3f4e5d6c7b8a9901a2b3c4d5e6f708192a3b4c5d"
 COLLECTOR = "0x4f5e6d7c8b9a00112233445566778899aabbccdd"
@@ -60,6 +64,104 @@ class V2DemoScenarioService:
 
     def __init__(self, store: Store) -> None:
         self.store = store
+
+    async def create_showcase_pack(self) -> dict:
+        """Create an idempotent, explicitly synthetic set of linked investigations."""
+        first = await self.create_deposit_inference()
+        pairs = [(first["case"], first["result"])]
+        asset = AssetRef(chain=Chain.ETHEREUM, symbol="USDT", contract_address="0xdac17f958d2ee523a2206206994597c13d831ec7", decimals=6, canonical_asset_id="USD_STABLE/USDT")
+
+        for index, (external_ref, title, amount, root_number) in enumerate(SHOWCASE_CASES, start=2):
+            root = f"0x{root_number:040x}"
+            case = next((item for item in self.store.list_investigation_cases_v2() if item.external_case_ref == external_ref), None)
+            if case is None:
+                started = datetime(2026, 9, 20, 9 + index, 0, tzinfo=timezone.utc)
+                case = self.store.create_investigation_case_v2(CaseCreateV2(
+                    title=title,
+                    external_case_ref=external_ref,
+                    trace_policy_id="v2-proportional-haircut",
+                    context=CaseContextV2(
+                        seed_type=SeedType.TRANSACTION,
+                        chain=Chain.ETHEREUM,
+                        asset=asset,
+                        disputed_amount=Decimal(str(amount)),
+                        incident_time=started,
+                        seed_tx_hash=f"0x{root_number:064x}",
+                        seed_wallet=root,
+                        data_mode="SYNTHETIC",
+                    ),
+                ), "synthetic-showcase")
+
+            existing = self.store.list_investigation_results_v2(case.id)
+            if existing:
+                snapshot = existing[0]
+            else:
+                started = case.context.incident_time
+                if index == 2:
+                    transfers = [
+                        self._transfer("SHOW2-IN", root, DEPOSIT, str(amount), started + timedelta(minutes=2), asset),
+                        self._transfer("SHOW2-OUT", DEPOSIT, COLLECTOR, str(amount - 50), started + timedelta(minutes=8), asset),
+                    ]
+                else:
+                    branch = f"0x{(root_number + 0xABC):040x}"
+                    transfers = [
+                        self._transfer("SHOW3-IN", root, branch, str(amount), started + timedelta(minutes=1), asset),
+                        self._transfer("SHOW3-MID", branch, DEPOSIT, str(amount - 100), started + timedelta(minutes=5), asset),
+                        self._transfer("SHOW3-OUT", DEPOSIT, COLLECTOR, str(amount - 200), started + timedelta(minutes=12), asset),
+                    ]
+                seed = FlowSeed(
+                    id=f"SEED-{external_ref.replace('/', '-')}",
+                    address=root,
+                    asset=asset,
+                    amount=Decimal(str(amount)),
+                    timestamp=started,
+                    seed_type=SeedType.TRANSACTION,
+                    source_transaction_id=f"TX-{external_ref}",
+                    source_evidence_id=f"EVID-{external_ref}",
+                )
+                resolver = EntityResolver(self.store)
+                engine = FundFlowEngineV2(
+                    _Repository(transfers),
+                    _Balances(),
+                    terminal_classifier=lambda transfer: TerminalReason.VERIFIED_VASP if transfer.destination_address == COLLECTOR else None,
+                )
+                flow = await engine.trace(seed, TracePolicyV2(max_hops=4))
+                attribution = AttributionEngineV2(resolver).build(flow, Chain.ETHEREUM.value, started + timedelta(minutes=30))
+                limitations = ["SYNTHETIC DEMO: all transfers and wallet addresses are generated locally. This scenario demonstrates cross-case evidence links and is not live intelligence or operational attribution."]
+                snapshot = InvestigationResultService(self.store).create(
+                    case, flow, attribution, transfers, [], limitations, started + timedelta(minutes=30),
+                )
+            pairs.append((case, snapshot))
+
+        connection_map = {}
+        for case, _ in pairs:
+            for connection in self.store.list_case_connections_v2(case.id):
+                case_pair = tuple(sorted((connection.source_case_id, connection.related_case_id)))
+                key = (connection.connection_type.value, connection.relation_key.casefold(), case_pair)
+                connection_map.setdefault(key, connection)
+
+        return {
+            "data_mode": "SYNTHETIC",
+            "cases": [
+                {
+                    "id": case.id,
+                    "title": case.title,
+                    "external_case_ref": case.external_case_ref,
+                    "status": case.status,
+                    "data_mode": case.context.data_mode.value,
+                    "chain": case.context.chain.value,
+                    "asset": case.context.asset.symbol,
+                    "seed_type": case.context.seed_type.value,
+                    "result_id": result.id,
+                    "result_version": result.version,
+                    "transfer_count": len(result.transfers),
+                    "candidate_count": len(result.attribution.candidates),
+                    "disputed_amount": str(case.context.disputed_amount),
+                }
+                for case, result in pairs
+            ],
+            "connections": list(connection_map.values()),
+        }
 
     async def create_deposit_inference(self) -> dict:
         asset = AssetRef(chain=Chain.ETHEREUM, symbol="USDT", contract_address="0xdac17f958d2ee523a2206206994597c13d831ec7", decimals=6, canonical_asset_id="USD_STABLE/USDT")

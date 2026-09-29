@@ -11,8 +11,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600;700&family=Geist:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="/static/landing.css">
-  <link rel="stylesheet" href="/static/styles.css">
+  <link rel="stylesheet" href="/static/landing.css?v=20260929-showcase1">
+  <link rel="stylesheet" href="/static/styles.css?v=20260929-showcase1">
 </head>
 <body style="background-color: #18181b;">
 
@@ -82,12 +82,12 @@
 
         <!-- Zeabur-style Agent Input Box -->
         <form id="agentPromptForm" class="landing-agent-box">
-          <span class="landing-agent-badge">Ask Agent</span>
+          <span class="landing-agent-badge">Wallet Trace</span>
           <input
             id="agentPromptInput"
             class="landing-agent-input"
             type="text"
-            placeholder="Paste suspect wallet (0x... or T...) or transaction hash to trace..."
+            placeholder="Paste a suspect wallet address (0x... or T...)..."
             spellcheck="false"
           />
           <button id="agentUploadBtn" type="button" class="landing-agent-btn-upload" title="Import trace JSON/CSV package">
@@ -97,13 +97,19 @@
               <line x1="12" y1="3" x2="12" y2="15" />
             </svg>
           </button>
-          <button type="submit" class="landing-agent-btn-submit" title="Run Trace">
+          <button type="submit" class="landing-agent-btn-submit" title="Open wallet trace intake">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
               <line x1="12" y1="19" x2="12" y2="5" />
               <polyline points="5 12 12 5 19 12" />
             </svg>
           </button>
         </form>
+        <div class="landing-showcase-entry">
+          <button type="button" class="btn-landing-secondary" onclick="window.launchWorkbench(); document.getElementById('v2DemoButton').click();">
+            Explore 3 linked synthetic investigations <span aria-hidden="true">↗</span>
+          </button>
+          <p>Training cases with exact shared-evidence links. Clearly marked synthetic throughout.</p>
+        </div>
       </div>
     </section>
 
@@ -138,10 +144,10 @@
     <section id="sandbox" class="landing-sandbox-section">
       <div class="landing-sandbox-container">
         <div>
-          <div class="landing-section-eyebrow">LIVE FORENSIC DEMONSTRATION</div>
-          <h2 class="landing-section-title">Interactive Trace & Attribution Sandbox</h2>
+          <div class="landing-section-eyebrow">SIMULATED EXAMPLES · NOT LIVE CASES</div>
+          <h2 class="landing-section-title">Forensic Workflow Illustrations</h2>
           <p class="landing-section-sub">
-            Select an investigation scenario to inspect real-time flow allocation, provider provenance checks, and autonomous defensible action readiness.
+            These preset figures are hardcoded illustrations and do not come from a trace or provider API. Use the 3-case showcase in the workbench to explore saved, evidence-linked synthetic investigations.
           </p>
         </div>
 
@@ -284,7 +290,7 @@
             Launch Investigation Workbench
           </button>
           <button class="btn-landing-secondary" style="padding: 10px 22px; font-size: 0.95rem;" onclick="window.launchWorkbench(); document.getElementById('v2DemoButton').click();">
-            Load Demonstration Case
+            Load 3-Case Showcase
           </button>
         </div>
       </div>
@@ -323,7 +329,7 @@
         <a href="javascript:void(0)" onclick="window.showLandingPage()" style="color: var(--blue); font-weight: 700; display: flex; align-items: center; gap: 4px;">
           ← Overview & Landing
         </a>
-        <a href="#investigations">Investigations</a>
+        <a href="#investigationCases">Investigations</a>
         <a href="#connections">Connections</a>
       </nav>
 
@@ -355,7 +361,7 @@
               <button id="reviewIntelligenceButton" class="button secondary">Review queue</button>
               <button id="bridgeWorkflowButton" class="button secondary">Cross-chain evidence</button>
               <button id="caseHistoryButton" class="button secondary">Case history</button>
-              <button id="v2DemoButton" class="button secondary">Load v2 demonstration</button>
+              <button id="v2DemoButton" class="button secondary">Load 3-case showcase</button>
               <button id="newCaseButton" class="button secondary">Legacy case intake</button>
             </div>
           </details>
@@ -369,6 +375,39 @@
         </div>
         <div id="capabilityMatrix" class="capability-matrix" aria-live="polite"><p class="empty">Loading chain capabilities…</p></div>
       </details>
+
+      <section id="investigationCases" class="showcase-section" aria-labelledby="showcaseCasesTitle">
+        <div class="showcase-section-head">
+          <div>
+            <p class="eyebrow">Case workspace</p>
+            <h2 id="showcaseCasesTitle">Investigations</h2>
+            <p class="subtle">Open saved cases, compare their trace results, and follow exact evidence links between them.</p>
+          </div>
+          <div class="showcase-section-actions">
+            <span id="showcaseCaseCount" class="type-badge">0 cases</span>
+            <button id="refreshShowcaseCases" class="icon-button" type="button" title="Refresh investigations" aria-label="Refresh investigations">↻</button>
+            <button id="loadShowcaseCases" class="button secondary" type="button">Load 3-case showcase</button>
+          </div>
+        </div>
+        <p id="showcaseBoardStatus" class="showcase-board-status" role="status" aria-live="polite"></p>
+        <div id="showcaseCaseList" class="showcase-case-grid" aria-live="polite">
+          <p class="showcase-empty">Loading saved investigations…</p>
+        </div>
+      </section>
+
+      <section id="connections" class="showcase-section connections-showcase" aria-labelledby="showcaseConnectionsTitle">
+        <div class="showcase-section-head">
+          <div>
+            <p class="eyebrow">Cross-case evidence</p>
+            <h2 id="showcaseConnectionsTitle">Connections</h2>
+            <p class="subtle">Exact shared addresses, transactions, or reviewed entities are shown as investigation leads, not proof of common ownership.</p>
+          </div>
+          <span id="showcaseConnectionCount" class="type-badge">0 links</span>
+        </div>
+        <div id="showcaseConnections" class="showcase-connection-list" aria-live="polite">
+          <p class="showcase-empty">Connections appear when saved investigations share exact evidence.</p>
+        </div>
+      </section>
 
       <section class="command-layout">
         <aside class="case-rail card">
@@ -446,7 +485,7 @@
               </div>
               <div id="v2Integrity" class="v2-inference-grid"><p class="empty">Integrity verification has not been run for this view.</p></div>
             </section>
-            <section class="v2-inference-panel" id="connections">
+            <section class="v2-inference-panel" id="caseConnections">
               <div class="v2-section-head"><div><p class="eyebrow">Related investigations</p><h3>Exact shared infrastructure</h3></div></div>
               <div id="v2Connections" class="v2-inference-grid"><p class="empty">No cross-case links loaded.</p></div>
             </section>
@@ -788,7 +827,7 @@
   <script src="/static/vendor/cytoscape.min.js"></script>
   <script src="/static/graph.js"></script>
   <script src="/static/app.js"></script>
-  <script src="/static/v2.js"></script>
-  <script src="/static/landing.js"></script>
+  <script src="/static/v2.js?v=20260929-showcase1"></script>
+  <script src="/static/landing.js?v=20260929-showcase1"></script>
 </body>
 </html>

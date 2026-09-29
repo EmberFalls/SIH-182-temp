@@ -148,6 +148,29 @@ def test_v2_synthetic_demo_is_explicit_and_contains_flow_and_inference():
     assert payload["deposit_inferences"][0]["assertion_type"] == "RULE_INFERRED"
     assert "SYNTHETIC DEMO" in payload["limitations"][0]
 
+
+def test_v2_showcase_pack_creates_multiple_cases_and_evidence_linked_connections():
+    response = client.post("/demo/scenarios/v2-showcase-pack")
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert payload["data_mode"] == "SYNTHETIC"
+    assert len(payload["cases"]) == 3
+    assert len({item["external_case_ref"] for item in payload["cases"]}) == 3
+    assert all(item["data_mode"] == "SYNTHETIC" for item in payload["cases"])
+    assert payload["connections"]
+    assert {item["connection_type"] for item in payload["connections"]} >= {"SAME_ADDRESS", "SAME_VERIFIED_ENTITY"}
+
+    for case in payload["cases"]:
+        response = client.get(f"/v2/cases/{case['id']}/connections")
+        assert response.status_code == 200
+        assert response.json()
+
+    repeated = client.post("/demo/scenarios/v2-showcase-pack")
+    assert repeated.status_code == 200
+    assert {item["id"] for item in repeated.json()["cases"]} == {item["id"] for item in payload["cases"]}
+    assert {item["id"] for item in repeated.json()["connections"]} == {item["id"] for item in payload["connections"]}
+
 def test_v2_ml_feature_snapshot_api_is_time_bounded_and_retrievable():
     asset = {"chain": "ETHEREUM", "symbol": "USDT", "contract_address": "0x" + "c" * 40, "decimals": 6}
     payload = {

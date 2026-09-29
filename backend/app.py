@@ -161,6 +161,14 @@ async def load_v2_deposit_inference_demo(request: Request) -> dict:
     audit(request, "SYNTHETIC_V2_DEMO_LOADED", result["case"].id, {"scenario": "v2_deposit_inference"})
     return result
 
+
+@app.post("/demo/scenarios/v2-showcase-pack")
+async def load_v2_showcase_pack(request: Request) -> dict:
+    """Load three linked synthetic investigations for the local showcase."""
+    result = await V2DemoScenarioService(store).create_showcase_pack()
+    audit(request, "SYNTHETIC_V2_SHOWCASE_LOADED", "VASP-TRACE-SHOWCASE", {"case_count": len(result["cases"]), "connection_count": len(result["connections"])})
+    return result
+
 @app.post("/cases", response_model=CaseSummary, status_code=status.HTTP_201_CREATED)
 def create_case(payload: CaseCreate, request: Request) -> CaseSummary:
     if payload.incident_start and payload.incident_end and payload.incident_end < payload.incident_start:

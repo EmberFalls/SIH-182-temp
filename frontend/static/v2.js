@@ -106,9 +106,20 @@
     if (!target || !caseId) return;
     target.innerHTML = '<p class="empty">Checking permitted saved-case connections…</p>';
     try {
-      const connections = await request(`/v2/cases/${caseId}/connections`, { method: "GET" });
+      const links = await request(`/v2/cases/${caseId}/connections`, { method: "GET" });
       if (resultState?.case?.id !== caseId) return;
-      target.innerHTML = connections.length ? connections.map(item => `<article class="v2-inference-card"><span class="claim-state verified">${escapeHtml(item.connection_type.replaceAll("_", " "))}</span><strong>${escapeHtml(item.related_case_id)}</strong><p><code>${escapeHtml(short(item.relation_key))}</code></p><small>${escapeHtml(item.explanation)}</small></article>`).join("") : '<p class="empty">No exact shared address, transaction, or reviewed entity has been recorded with another accessible case.</p>';
+      const unique = new Map();
+      for (const item of links) {
+        const casePair = [item.source_case_id, item.related_case_id].sort().join(":");
+        const key = `${item.connection_type}:${String(item.relation_key).toLowerCase()}:${casePair}`;
+        if (!unique.has(key)) unique.set(key, item);
+      }
+      const connections = [...unique.values()];
+      target.innerHTML = connections.length ? connections.map(item => {
+        const relatedId = item.source_case_id === caseId ? item.related_case_id : item.source_case_id;
+        const relatedTitle = showcaseCases.find(row => row.item.id === relatedId)?.item.title || relatedId;
+        return `<article class="v2-inference-card"><span class="claim-state verified">${escapeHtml(item.connection_type.replaceAll("_", " "))}</span><strong>${escapeHtml(relatedTitle)}</strong><p><code>${escapeHtml(short(item.relation_key))}</code></p><small>${escapeHtml(item.explanation)}</small></article>`;
+      }).join("") : '<p class="empty">No exact shared address, transaction, or reviewed entity has been recorded with another accessible case.</p>';
     } catch (error) { target.innerHTML = `<p class="empty">Case connections unavailable: ${escapeHtml(error.message)}</p>`; }
   }
 
@@ -145,6 +156,146 @@
       notice("Investigator note recorded.");
     } catch (error) { notice(`Note was not saved: ${error.message}`, "error"); }
   }
+
+  let showcaseCases = [];
+
+  function renderShowcaseCases(rows) {
+    const target = q("#showcaseCaseList");
+    const count = q("#showcaseCaseCount");
+    if (!target) return;
+    if (count) count.textContent = `${rows.length} investigation${rows.length === 1 ? "" : "s"}`;
+    if (!rows.length) {
+      target.innerHTML = '<div class="showcase-empty-card"><strong>No saved VASP Trace investigations yet</strong><p>Load the three-case synthetic showcase to see linked cases and evidence-backed connections.</p><button class="button secondary" type="button" data-load-showcase>Load 3-case showcase</button></div>';
+      target.querySelector("[data-load-showcase]")?.addEventListener("click", loadShowcasePack);
+      return;
+    }
+    target.innerHTML = rows.map(({ item, results }) => {
+      const result = results[0];
+      const context = item.context || {};
+      const asset = context.asset || {};
+      const mode = String(context.data_mode || "LIVE").toUpperCase();
+      const seed = context.seed_type === "TRANSACTION" ? `TX ${short(context.seed_tx_hash)}` : short(context.seed_wallet);
+      const evidenceSummary = result
+        ? `${result.transfers?.length || 0} transfers · ${result.attribution?.candidates?.length || 0} VASP candidate${result.attribution?.candidates?.length === 1 ? "" : "s"}`
+        : "Trace result not available yet";
+      const traceValue = result ? `${money(result.flow?.seed_amount)} ${escapeHtml(asset.symbol || "asset")}` : `${money(context.disputed_amount)} ${escapeHtml(asset.symbol || "asset")}`;
+      return `<article class="showcase-case-card ${mode === "SYNTHETIC" ? "simulated" : ""}">
+        <div class="showcase-card-top"><span class="showcase-mode ${mode === "SYNTHETIC" ? "simulated" : "live"}">${mode === "SYNTHETIC" ? "SYNTHETIC DEMO" : escapeHtml(mode.replaceAll("_", " "))}</span><span class="showcase-case-status">${escapeHtml(item.status || "OPEN")}</span></div>
+        <p class="showcase-case-ref">${escapeHtml(item.external_case_ref || item.id)}</p>
+        <h3>${escapeHtml(item.title)}</h3>
+        <div class="showcase-case-meta"><span>${escapeHtml(context.chain || "Unknown chain")} · ${escapeHtml(asset.symbol || "asset")}</span><span>${escapeHtml(String(context.seed_type || "wallet").replaceAll("_", " "))} seed · ${escapeHtml(seed)}</span></div>
+        <div class="showcase-case-result"><strong>${traceValue}</strong><span>${escapeHtml(evidenceSummary)}</span></div>
+        <button class="button secondary small showcase-open-case" type="button" data-open-showcase-case="${escapeHtml(item.id)}" ${result ? `data-result-id="${escapeHtml(result.id)}"` : ""}>${result ? "Open investigation" : "Run trace"}<span aria-hidden="true">↗</span></button>
+      </article>`;
+    }).join("");
+    target.querySelectorAll("[data-open-showcase-case]").forEach(button => {
+      button.addEventListener("click", () => openShowcaseCase(button.dataset.openShowcaseCase, button.dataset.resultId));
+    });
+  }
+
+  function renderShowcaseConnections(connections, cases) {
+    const target = q("#showcaseConnections");
+    const count = q("#showcaseConnectionCount");
+    if (!target) return;
+    if (count) count.textContent = `${connections.length} evidence link${connections.length === 1 ? "" : "s"}`;
+    if (!connections.length) {
+      target.innerHTML = cases.length > 1
+        ? '<p class="showcase-empty">No exact shared evidence has been found across these saved cases. Similar amounts or timing are not treated as a link.</p>'
+        : '<p class="showcase-empty">Load the linked showcase cases to see exact shared addresses and reviewed-entity evidence here.</p>';
+      return;
+    }
+    const caseById = new Map(cases.map(({ item }) => [item.id, item]));
+    const labels = { SAME_ADDRESS: "Shared blockchain address", SAME_TRANSACTION: "Shared transaction reference", SAME_VERIFIED_ENTITY: "Shared reviewed VASP" };
+    target.innerHTML = connections.map(link => {
+      const source = caseById.get(link.source_case_id);
+      const related = caseById.get(link.related_case_id);
+      const relation = link.connection_type === "SAME_ADDRESS" ? short(link.relation_key) : escapeHtml(link.relation_key);
+      return `<article class="showcase-connection-card">
+        <div class="showcase-connection-kind"><span class="connection-mark" aria-hidden="true">⟷</span><span>${escapeHtml(labels[link.connection_type] || link.connection_type.replaceAll("_", " "))}</span></div>
+        <div class="showcase-connection-pair">
+          <button type="button" class="showcase-case-link" data-open-showcase-case="${escapeHtml(link.source_case_id)}">${escapeHtml(source?.title || link.source_case_id)}</button>
+          <span aria-hidden="true">↔</span>
+          <button type="button" class="showcase-case-link" data-open-showcase-case="${escapeHtml(link.related_case_id)}">${escapeHtml(related?.title || link.related_case_id)}</button>
+        </div>
+        <p class="showcase-relation-key"><span>Matched evidence</span><code>${relation}</code></p>
+        <p class="showcase-connection-explanation">${escapeHtml(link.explanation)}</p>
+        <small>${link.evidence_ids?.length || 0} supporting record references · ${escapeHtml(dateText(link.created_at))}</small>
+      </article>`;
+    }).join("");
+    target.querySelectorAll("[data-open-showcase-case]").forEach(button => {
+      button.addEventListener("click", () => openShowcaseCase(button.dataset.openShowcaseCase));
+    });
+  }
+
+  async function refreshInvestigationBoard() {
+    const target = q("#showcaseCaseList");
+    const status = q("#showcaseBoardStatus");
+    if (!target) return;
+    if (status) status.textContent = "Refreshing saved investigations and exact evidence links…";
+    try {
+      const cases = await request("/v2/cases", { method: "GET" });
+      showcaseCases = await Promise.all(cases.map(async item => {
+        try {
+          const results = await request(`/v2/cases/${item.id}/results`, { method: "GET" });
+          return { item, results };
+        } catch {
+          return { item, results: [] };
+        }
+      }));
+      const connectionSets = await Promise.all(cases.map(async item => {
+        try { return await request(`/v2/cases/${item.id}/connections`, { method: "GET" }); }
+        catch { return []; }
+      }));
+      const unique = new Map();
+      for (const link of connectionSets.flat()) {
+        const casePair = [link.source_case_id, link.related_case_id].sort().join(":");
+        const key = `${link.connection_type}:${String(link.relation_key).toLowerCase()}:${casePair}`;
+        if (!unique.has(key)) unique.set(key, link);
+      }
+      renderShowcaseCases(showcaseCases);
+      renderShowcaseConnections([...unique.values()], showcaseCases);
+      if (status) status.textContent = cases.length ? `Showing ${cases.length} saved VASP Trace investigation${cases.length === 1 ? "" : "s"}.` : "No saved VASP Trace investigations yet. Load the synthetic showcase to explore the workflow.";
+    } catch (error) {
+      target.innerHTML = `<p class="showcase-empty">Could not load investigations: ${escapeHtml(error.message)}</p>`;
+      if (status) status.textContent = "Investigation board could not connect to the API.";
+      renderShowcaseConnections([], []);
+    }
+  }
+
+  async function openShowcaseCase(caseId, resultId = null) {
+    const cached = showcaseCases.find(({ item }) => item.id === caseId);
+    if (!cached) return;
+    try {
+      const caseRecord = await request(`/v2/cases/${caseId}`, { method: "GET" });
+      const latestResultId = resultId || cached.results?.[0]?.id;
+      const savedResult = latestResultId
+        ? await request(`/v2/results/${latestResultId}`, { method: "GET" })
+        : await request(`/v2/cases/${caseId}/trace`, { body: "{}" });
+      render({ ...savedResult, case: caseRecord });
+      q("#v2Workbench")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      await refreshInvestigationBoard();
+    } catch (error) {
+      const status = q("#showcaseBoardStatus");
+      if (status) status.textContent = `Could not open ${cached.item.title}: ${error.message}`;
+    }
+  }
+
+  async function loadShowcasePack() {
+    const buttons = [q("#loadShowcaseCases"), q("#v2DemoButton")].filter(Boolean);
+    const status = q("#showcaseBoardStatus");
+    buttons.forEach(button => { button.disabled = true; });
+    if (status) status.textContent = "Preparing three clearly marked synthetic cases and indexing their exact evidence links…";
+    try {
+      const pack = await request("/demo/scenarios/v2-showcase-pack", { body: "{}" });
+      await refreshInvestigationBoard();
+      if (status) status.textContent = `Loaded ${pack.cases.length} synthetic investigations and ${pack.connections.length} exact evidence links. These are training records, not live blockchain findings.`;
+    } catch (error) {
+      if (status) status.textContent = `Showcase cases could not be loaded: ${error.message}`;
+    } finally {
+      buttons.forEach(button => { button.disabled = false; });
+    }
+  }
+
   async function load() {
     try {
       render(await request("/demo/scenarios/v2-deposit-inference"));
@@ -307,6 +458,7 @@
       q("#v2CaseDialog").close();
       event.target.reset();
       render({ ...result, case: caseRecord });
+      await refreshInvestigationBoard();
     } catch (error) {
       const notice = q("#notice");
       if (notice) { notice.hidden = false; notice.className = "notice error"; notice.textContent = error.message; }
@@ -333,6 +485,8 @@
   q("#reviewIntelligenceButton")?.addEventListener("click", () => q("#intelligenceReviewDialog").showModal());
   q("#bridgeWorkflowButton")?.addEventListener("click", () => q("#bridgeWorkflowDialog").showModal());
   q("#caseHistoryButton")?.addEventListener("click", () => { q("#caseHistoryDialog").showModal(); loadCaseHistory(); });
+  q("#loadShowcaseCases")?.addEventListener("click", loadShowcasePack);
+  q("#refreshShowcaseCases")?.addEventListener("click", refreshInvestigationBoard);
   q("#intelligenceLookupForm")?.addEventListener("submit", lookupIntelligence);
   q("#bridgeExtractForm")?.addEventListener("submit", extractBridgeEvent);
   q("#bridgeResolveForm")?.addEventListener("submit", resolveBridgeEvents);
@@ -341,7 +495,7 @@
   q("#recordedImportForm")?.addEventListener("submit", importRecordedPackage);
   q("#csvImportForm")?.addEventListener("submit", importRecordedCsv);
   q("#intelligenceImportForm")?.addEventListener("submit", importIntelligenceCsv);
-  q("#v2DemoButton")?.addEventListener("click", load);
+  q("#v2DemoButton")?.addEventListener("click", loadShowcasePack);
   q("#newV2CaseButton")?.addEventListener("click", () => q("#v2CaseDialog").showModal());
   q("#v2CaseForm")?.addEventListener("submit", createLiveCase);
   q("#v2ReportButton")?.addEventListener("click", () => { if (resultState?.id) window.open(`/v2/results/${resultState.id}/report.pdf`, "_blank", "noopener"); });
@@ -350,5 +504,6 @@
   q("#v2EvidenceBundleButton")?.addEventListener("click", () => { if (resultState?.id) window.open(`/v2/results/${resultState.id}/evidence-bundle.zip`, "_blank", "noopener"); });
   q("#v2AnnotationForm")?.addEventListener("submit", addAnnotation);
   q("#closeV2Button")?.addEventListener("click", close);
-  window.VaspTraceV2 = { load, render, get result() { return resultState; } };
+  refreshInvestigationBoard();
+  window.VaspTraceV2 = { load, loadShowcasePack, refreshInvestigationBoard, render, get result() { return resultState; } };
 })();
