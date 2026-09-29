@@ -61,6 +61,8 @@ function renderCase(caseData, resetTrace) {
   state.selected = caseData;
   if (resetTrace) state.trace = null;
   $("#emptyState").hidden = true;
+  const v2 = $("#v2Workbench");
+  if (v2) v2.hidden = true;
   $("#caseView").hidden = false;
   $("#caseMeta").textContent = `${caseData.id} · ${caseData.chain} · ${caseData.token_symbol} · ${caseData.case_status.replaceAll("_", " ")}`;
   $("#caseTitle").textContent = caseData.title;
